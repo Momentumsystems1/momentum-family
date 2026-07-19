@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Momentum Family",
+    "slug": "momentum-family",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.momentumsystems.family"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.momentumsystems.family"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Momentum Family utiliza tu ubicación para compartirla con los miembros que hayas autorizado."
+        }
+      ]
+    ],
+    "scheme": "momentumfamily",
+    "description": "Movilidad, tranquilidad y seguridad para toda la familia."
+  }
+}
