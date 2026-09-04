@@ -1,30 +1,37 @@
-import { View, StyleSheet, Image } from "react-native";
+// Bootstrap: resolves where the user is (legal onboarding → account → consent → profile → group → map) and survives restarts.
+import { Redirect } from "expo-router";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, View } from "react-native";
 
-const EXPO_PUBLIC_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+import { getLocalOnboarding, useAuth } from "@/src/auth";
+import { T } from "@/src/components/ui";
+import { useTheme } from "@/src/theme";
+
+const LOCAL_ROUTES: Record<string, string> = { terms: "/onboarding/terms", data: "/onboarding/data", transparency: "/onboarding/transparency", security: "/onboarding/security", account: "/onboarding/account" };
+const SERVER_ROUTES: Record<string, string> = { consent: "/onboarding/consent", profile: "/onboarding/profile", group: "/onboarding/group", done: "/map" };
 
 export default function Index() {
-  console.log(EXPO_PUBLIC_BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL");
+  const { user, loading } = useAuth();
+  const { colors } = useTheme();
+  const [target, setTarget] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (loading) return;
+    (async () => {
+      if (user) {
+        if (user.onboarding?.completed) return setTarget("/map");
+        return setTarget(SERVER_ROUTES[user.onboarding?.step] ?? "/onboarding/consent");
+      }
+      const local = await getLocalOnboarding();
+      setTarget(LOCAL_ROUTES[local.step] ?? "/onboarding/terms");
+    })();
+  }, [user, loading]);
+
+  if (target) return <Redirect href={target as any} />;
   return (
-    <View style={styles.container}>
-      <Image
-        source={require("../assets/images/app-image.png")}
-        style={styles.image}
-      />
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, gap: 12 }} testID="bootstrap-screen">
+      <ActivityIndicator color={colors.brandPrimary} />
+      <T style={{ color: colors.muted }}>Sentinel</T>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0c0c0c",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  image: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-});

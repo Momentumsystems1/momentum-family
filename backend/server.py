@@ -1,75 +1,74 @@
-from fastapi import FastAPI, APIRouter
-from dotenv import load_dotenv
-from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
-import os
 import logging
-from pathlib import Path
-from pydantic import BaseModel, Field
-from typing import List
-import uuid
-from datetime import datetime
+
+from fastapi import APIRouter, Depends, FastAPI
+from fastapi.exceptions import HTTPException
+from fastapi.requests import Request
+from fastapi.responses import JSONResponse
+from starlette.middleware.cors import CORSMiddleware
+
+from core import Unavailable, client, current_user, db, now
+from routers import auth, consent, coordination, entitlements, groups, people, providers
+from routers.providers import provider_status
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logger = logging.getLogger("sentinel")
+
+app = FastAPI(title="Sentinel Family API")
+api = APIRouter(prefix="/api")
+
+for r in (auth.router, consent.router, entitlements.router, groups.router, people.router, providers.router,
+          coordination.router):
+    api.include_router(r)
 
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# Create the main app without a prefix
-app = FastAPI()
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
-
-# Define Models
-class StatusCheck(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    client_name: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-
-class StatusCheckCreate(BaseModel):
-    client_name: str
-
-# Add your routes to the router instead of directly to app
-@api_router.get("/")
+@api.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"service": "sentinel-family", "status": "ok", "time": now().isoformat()}
 
-@api_router.post("/status", response_model=StatusCheck)
-async def create_status_check(input: StatusCheckCreate):
-    status_dict = input.dict()
-    status_obj = StatusCheck(**status_dict)
-    _ = await db.status_checks.insert_one(status_obj.dict())
-    return status_obj
 
-@api_router.get("/status", response_model=List[StatusCheck])
-async def get_status_checks():
-    status_checks = await db.status_checks.find().to_list(1000)
-    return [StatusCheck(**status_check) for status_check in status_checks]
+# Camera sharing: session model exists, streaming transport does not (WebRTC/TURN + native build required).
+@api.post("/camera/sessions")
+async def camera_session(user=Depends(current_user)):
+    await db.camera_requests.insert_one({"user_id": str(user["_id"]), "created_at": now(), "status": "blocked_no_transport"})
+    raise Unavailable("service", "La transmisión de cámara requiere WebRTC con servidor TURN y una build nativa.", "camera")
 
-# Include the router in the main app
-app.include_router(api_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@api.post("/road-reality/publish")
+async def road_reality_publish(user=Depends(current_user)):
+    raise Unavailable("service", "La publicación requiere anonimización de rostros y matrículas; no hay servicio configurado.",
+                      "roadReality")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+
+@api.get("/system/status")
+async def system_status():
+    return {"providers": provider_status(), "time": now().isoformat()}
+
+
+app.include_router(api)
+
+
+@app.exception_handler(HTTPException)
+async def http_exc(_: Request, exc: HTTPException):
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+
+@app.on_event("startup")
+async def startup():
+    await db.users.create_index("email", unique=True)
+    await db.sessions.create_index("expires_at", expireAfterSeconds=0)
+    await db.sessions.create_index("token_hash")
+    await db.invitations.create_index("token", unique=True)
+    await db.members.create_index([("group_id", 1), ("user_id", 1)])
+    await db.positions.create_index("at", expireAfterSeconds=30 * 24 * 3600)
+    await db.positions_latest.create_index("user_id", unique=True)
+    await db.permission_events.create_index([("user_id", 1), ("created_at", 1)])
+    await entitlements.seed_plans()
+    logger.info("Sentinel API ready. Providers: %s", {k: v["provider"] for k, v in provider_status().items()})
+
 
 @app.on_event("shutdown")
-async def shutdown_db_client():
+async def shutdown():
     client.close()
