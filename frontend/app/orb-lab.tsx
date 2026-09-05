@@ -1,11 +1,11 @@
 import React from "react";
 
-import { OrbPersonalityLab } from "@/src/orb-lab/OrbPersonalityLab";
+import { OrbSequenceEmergent } from "@/src/orb-lab/OrbSequenceEmergent";
 
 /**
- * Isolated fake-first route for polishing Sentinel Orb personality.
- * Production map/tool flows are intentionally not connected here.
+ * Isolated fake-first route built on Emergent's real Orb menu/rendering base.
+ * Only the orbital selection choreography is experimental here.
  */
 export default function OrbLab() {
-  return <OrbPersonalityLab />;
+  return <OrbSequenceEmergent />;
 }
