@@ -4,17 +4,15 @@ import Ionicons from "@react-native-vector-icons/ionicons";
 import React from "react";
 import { Pressable, Text, View } from "react-native";
 
-import type { MapPerson, MapPin } from "@/src/components/MapCanvas";
+import type { MapCanvasProps } from "@/src/components/MapCanvas";
 import { PersonAvatar } from "@/src/components/orbs";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
-type Props = { people: MapPerson[]; pins?: MapPin[]; polyline?: [number, number][]; onPersonPress?: (p: MapPerson) => void; center?: { lat: number; lng: number } };
-
-export function MapCanvas({ people, pins = [], onPersonPress }: Props) {
+export function MapCanvas({ people, pins = [], onPersonPress, onMapPress, selected }: MapCanvasProps) {
   const s = useStyles();
   const { colors } = useTheme();
   const located = people.filter((p) => p.state === "shared" && p.lat != null);
-  const pts = [...located.map((p) => ({ lat: p.lat!, lng: p.lng! })), ...pins.map((p) => ({ lat: p.lat, lng: p.lng }))];
+  const pts = [...located.map((p) => ({ lat: p.lat!, lng: p.lng! })), ...pins.map((p) => ({ lat: p.lat, lng: p.lng })), ...(selected ? [selected] : [])];
   const minLat = Math.min(...pts.map((p) => p.lat), 90), maxLat = Math.max(...pts.map((p) => p.lat), -90);
   const minLng = Math.min(...pts.map((p) => p.lng), 180), maxLng = Math.max(...pts.map((p) => p.lng), -180);
   const proj = (lat: number, lng: number) => ({
@@ -22,13 +20,14 @@ export function MapCanvas({ people, pins = [], onPersonPress }: Props) {
     top: `${pts.length > 1 && maxLat !== minLat ? 15 + ((maxLat - lat) / (maxLat - minLat)) * 60 : 45}%`,
   });
   return (
-    <View style={s.root} testID="map-canvas">
+    <Pressable style={s.root} testID="map-canvas" onPress={() => onMapPress?.()}>
       <View style={s.gridV} /><View style={[s.gridV, { left: "50%" }]} /><View style={[s.gridV, { left: "75%" }]} />
       <View style={s.gridH} /><View style={[s.gridH, { top: "50%" }]} /><View style={[s.gridH, { top: "75%" }]} />
       <View style={s.notice} testID="map-web-notice">
         <Ionicons name="map" size={14} color={colors.muted} />
         <Text style={s.noticeTxt}>Mapa nativo no disponible en web · vista espacial</Text>
       </View>
+      {selected ? <View style={[s.abs, proj(selected.lat, selected.lng) as any]} testID="map-selected-pin"><Ionicons name="location" size={30} color={colors.brandPrimary} /></View> : null}
       {pins.map((p) => (
         <View key={p.id} style={[s.abs, proj(p.lat, p.lng) as any]}>
           <Ionicons name="flag" size={26} color={p.color ?? colors.brandSecondary} />
@@ -47,7 +46,7 @@ export function MapCanvas({ people, pins = [], onPersonPress }: Props) {
           <Text style={s.emptyTxt}>Nadie comparte ubicación todavía</Text>
         </View>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 

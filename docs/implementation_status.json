@@ -1,5 +1,5 @@
 {
-  "generated": "2026-09-04",
+  "generated": "2026-09-06",
   "features": [
     {
       "feature": "P0 Onboarding legal (Términos → Datos → Transparencia → Ciberseguridad)",
@@ -98,20 +98,28 @@
       "notes": "Nominatim/OSRM quedan como fallback si falta la clave"
     },
     {
-      "feature": "P4 Orbe Sentinel — escena 3D del mind-map (grafo raíz→familias→herramientas, física de fuerzas portada, cámara orbital, profundidad) — renderer FALLBACK",
+      "feature": "Mapa estilo Life360: barra tipo Uber (Hola X, ¿nos movemos? · Grupo), hoja inferior de personas con estado/última actualización, acciones rápidas",
       "status": "COMPLETE",
-      "integration": "src/orb/* (nodes, physics, interactions, renderer, theme)",
+      "integration": "positions + groups",
       "tested": "Sí (web e2e)",
       "dependency": "—",
-      "notes": "Constantes centralizadas en orbTheme.ts"
+      "notes": "El Orbe navegador fue eliminado por decisión del usuario (2026-06)"
     },
     {
-      "feature": "P4 Orbe Sentinel — renderer HIGH (WebGL/Three.js)",
+      "feature": "NAVIGATION: historial por cercanía, autocompletar Azure (5 propuestas), popup de número, ruta con bandera, modos coche/moto/bici/a pie, paradas con nombre, POI en ruta (cafés, EV, gasolineras, descanso, parkings), personas del grupo en ruta, indicaciones",
+      "status": "COMPLETE",
+      "integration": "Azure Maps (fuzzy typeahead, directions, alongRoute)",
+      "tested": "Sí (web e2e + API)",
+      "dependency": "—",
+      "notes": "Transporte público y WC: SERVICIO NO CONFIGURADO; guiado por voz/background: build nativa"
+    },
+    {
+      "feature": "NAVIGATION fase 2: movilidad grupal (gestor, tarjetas por miembro, tareas, icono de movilizados)",
       "status": "NOT AVAILABLE",
-      "integration": "Interfaz RendererProps definida; OrbRendererHigh delega al fallback",
+      "integration": "—",
       "tested": "—",
-      "dependency": "expo-gl + three",
-      "notes": "Ver gaps"
+      "dependency": "Fase siguiente",
+      "notes": "Diseñado, no implementado"
     },
     {
       "feature": "Tarjetas estilo Pulse Engine (PulseCard: header/mono, barras, divisor, footer, flip 0.8 s, claro/oscuro)",
@@ -291,27 +299,6 @@
       "security": "Restringir clave por paquete.",
       "privacy": "Ninguna adicional.",
       "cost": "Pendiente de cotización o validación técnica.",
-      "time": "Pendiente de cotización o validación técnica."
-    },
-    {
-      "name": "Renderer WebGL del Orbe (Three.js / expo-gl)",
-      "status": "NOT AVAILABLE",
-      "done": "Arquitectura separada: orbNodes (datos), orbPhysics (simulación portada del template), orbInteractions (gestos), OrbRendererFallback (vistas nativas con profundidad), OrbRendererHigh (gate), orbTheme (constantes). El fallback ya reproduce composición, profundidad, expansión, cámara y física.",
-      "missing": "Implementación GL de RendererProps (esferas con material, bloom, HDRI).",
-      "reason": "expo-gl/three no integrados en esta build para evitar riesgo de bundle en Expo Go; el fallback cumple la fidelidad exigida.",
-      "api": "expo-gl + three (WebGLRenderer; WebGPU no existe en móvil)",
-      "account": "—",
-      "credential": "—",
-      "subscription": "—",
-      "infra": "—",
-      "payment": "No",
-      "approval": "No",
-      "files": "frontend/src/orb/OrbRendererHigh.tsx",
-      "changes": "Implementar escena three con los nodos proyectados; activar isHighRendererAvailable() con detección de GL.",
-      "activation": "yarn expo install expo-gl three → implementar → build nativa para validar rendimiento.",
-      "security": "—",
-      "privacy": "—",
-      "cost": "Sin coste",
       "time": "Pendiente de cotización o validación técnica."
     },
     {

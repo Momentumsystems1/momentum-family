@@ -28,6 +28,12 @@ Docs: `/app/docs` (25 md + ADRs + IMPLEMENTATION_STATUS.md + SENTINEL_IMPLEMENTA
 ## Cuentas de prueba
 Ver /app/memory/test_credentials.md.
 
+## Cambio 2026-06 (sesión 3)
+- Especificación maestra PDF anulada por el usuario; criterio propio.
+- Orbe navegador ELIMINADO (`src/orb/` borrado). Árbol reducido a funciones reales.
+- Mapa estilo Life360 + módulo NAVIGATION (Azure: autocomplete, nav-route, along-route, history).
+- Pendiente fase 2: movilidad grupal (gestor).
+
 ## Backlog priorizado
 - P0: Retest completo con testing agent en dispositivo (mapa nativo, SMS, haptics). Auth social cuando lleguen claves.
 - P1: Renderer WebGL del Orbe (expo-gl + three) sobre RendererProps. Object Storage para foto de avatar. Pago (RevenueCat).

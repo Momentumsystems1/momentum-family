@@ -1,3 +1,3 @@
-# Orbe Sentinel
+# Orbe Sentinel (ELIMINADO)
 
-`src/components/SentinelOrb.tsx`: arrastre con inercia (`withDecay`), acomodación en bordes, compresión 8 % al tocar, pulso interno, onda de energía, 7 familias en arco (release escalonado), herramienta seleccionada → contenedor inferior; cierre inverso. Reduce-motion respetado. Herramientas con `capability` se bloquean por entitlement (candado + popup).
+El Orbe navegador se retiró por decisión del usuario (2026-06). El árbol de funciones vive ahora en el mapa estilo Life360 (`app/map.tsx`): barra de búsqueda → Navigation, botón Grupo, hoja inferior con personas y acciones rápidas (Navegar, Quedar, Convoy, ¿Todo bien?, Anti-congestión, Actividad).

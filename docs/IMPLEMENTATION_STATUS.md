@@ -1,4 +1,4 @@
-# Implementation status (2026-09-04)
+# Implementation status (2026-09-06)
 
 Statuses: COMPLETE | PARTIAL | BLOCKED | NOT AVAILABLE
 
@@ -16,8 +16,9 @@ Statuses: COMPLETE | PARTIAL | BLOCKED | NOT AVAILABLE
 | P2 Roles y entitlements (Owner/Admin/…; canCreateGroups, max…) | COMPLETE | EntitlementService (routers/entitlements.py) | Sí (API 402) | — | Invitado temporal no crea grupos sin delegación |
 | P3 Mapa (react-native-maps) con avatares y estados veraces | PARTIAL | expo-location → /api/location | Solo web (placeholder veraz) | Expo Go nativo | Mapa nativo no verificable desde la vista web |
 | Proveedores Azure Maps (geocoding, rutas con tráfico, flujo de tráfico, tráfico predictivo) | COMPLETE | AZURE_MAPS_KEY configurada | Sí (API) | — | Nominatim/OSRM quedan como fallback si falta la clave |
-| P4 Orbe Sentinel — escena 3D del mind-map (grafo raíz→familias→herramientas, física de fuerzas portada, cámara orbital, profundidad) — renderer FALLBACK | COMPLETE | src/orb/* (nodes, physics, interactions, renderer, theme) | Sí (web e2e) | — | Constantes centralizadas en orbTheme.ts |
-| P4 Orbe Sentinel — renderer HIGH (WebGL/Three.js) | NOT AVAILABLE | Interfaz RendererProps definida; OrbRendererHigh delega al fallback | — | expo-gl + three | Ver gaps |
+| Mapa estilo Life360: barra tipo Uber (Hola X, ¿nos movemos? · Grupo), hoja inferior de personas con estado/última actualización, acciones rápidas | COMPLETE | positions + groups | Sí (web e2e) | — | El Orbe navegador fue eliminado por decisión del usuario (2026-06) |
+| NAVIGATION: historial por cercanía, autocompletar Azure (5 propuestas), popup de número, ruta con bandera, modos coche/moto/bici/a pie, paradas con nombre, POI en ruta (cafés, EV, gasolineras, descanso, parkings), personas del grupo en ruta, indicaciones | COMPLETE | Azure Maps (fuzzy typeahead, directions, alongRoute) | Sí (web e2e + API) | — | Transporte público y WC: SERVICIO NO CONFIGURADO; guiado por voz/background: build nativa |
+| NAVIGATION fase 2: movilidad grupal (gestor, tarjetas por miembro, tareas, icono de movilizados) | NOT AVAILABLE | — | — | Fase siguiente | Diseñado, no implementado |
 | Tarjetas estilo Pulse Engine (PulseCard: header/mono, barras, divisor, footer, flip 0.8 s, claro/oscuro) | COMPLETE | src/cards/* | Sí (web e2e) | — | Barras representan datos reales (permisos activos) |
 | P5 Orbe de persona (acciones contextuales) | PARTIAL | positions + events | Sí (render) | — | Llamar: sin teléfono en perfil; Cámara: BLOCKED |
 | P6 Tarjeta de privacidad doble cara (flip 3D) | COMPLETE | permissions + sessions + history | Sí | — | Conexiones de cámara: no configurado |

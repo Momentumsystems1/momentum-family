@@ -105,7 +105,156 @@ async def traffic_flow(lat: float, lng: float) -> dict:
                 "confidence": seg.get("confidence"), "road_closure": seg.get("roadClosure", False), "provider": "azure_maps"}
 
 
-# ---------------- endpoints ----------------
+# ---------------- NAVIGATION module (autocomplete, multi-mode routing with waypoints, POI along route, history) ----------------
+from typing import Optional as _Opt
+
+from core import db as _db, now as _now
+
+
+@router.get("/autocomplete")
+async def autocomplete(q: str, lat: _Opt[float] = None, lng: _Opt[float] = None, user=Depends(current_user)):
+    """Azure fuzzy typeahead biased to the user's position (nearest first). Returns whether a house number is present."""
+    if not AZURE_MAPS_KEY:
+        raise Unavailable("service", "Autocompletar requiere Azure Maps.", "geocoding")
+    params = {"api-version": "1.0", "subscription-key": AZURE_MAPS_KEY, "query": q, "typeahead": "true", "limit": 5, "language": "es-ES",
+              "countrySet": "ES,PT,FR,IT,DE,GB"}
+    import math
+    if lat is not None and lng is not None and not (math.isnan(lat) or math.isnan(lng)):
+        params.update({"lat": lat, "lon": lng, "radius": 50000})
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get("https://atlas.microsoft.com/search/fuzzy/json", params=params)
+            r.raise_for_status()
+    except httpx.HTTPError as e:
+        log.warning("autocomplete failed: %s", e)
+        raise Unavailable("service", "El autocompletar no respondió.", "geocoding")
+    out = []
+    for i in r.json().get("results", []):
+        a = i.get("address", {})
+        poi = i.get("poi", {}).get("name")
+        out.append({"name": (poi + " · " if poi else "") + a.get("freeformAddress", ""), "lat": i["position"]["lat"], "lng": i["position"]["lon"],
+                    "type": i.get("type"), "has_number": bool(a.get("streetNumber")) or bool(poi), "street": a.get("streetName"),
+                    "municipality": a.get("municipality"), "distance_m": i.get("dist")})
+    return out
+
+
+class NavRouteBody(BaseModel):
+    points: list[list[float]]  # [[lat,lng],...] origin, stops..., destination
+    mode: str = "car"  # car | motorcycle | bicycle | pedestrian
+    optimize_stops: bool = False
+
+
+@router.post("/nav-route")
+async def nav_route(body: NavRouteBody, user=Depends(current_user)):
+    if len(body.points) < 2:
+        raise Unavailable("service", "Se necesitan origen y destino.", "routing")
+    if not AZURE_MAPS_KEY:
+        raise Unavailable("service", "La navegación requiere Azure Maps.", "routing")
+    mode = body.mode if body.mode in ("car", "motorcycle", "bicycle", "pedestrian") else "car"
+    q = ":".join(f"{p[0]},{p[1]}" for p in body.points)
+    params = {"api-version": "1.0", "subscription-key": AZURE_MAPS_KEY, "query": q, "travelMode": mode, "traffic": "true",
+              "instructionsType": "text", "language": "es-ES", "routeRepresentation": "polyline"}
+    if body.optimize_stops and len(body.points) > 3:
+        params["computeBestOrder"] = "true"
+    try:
+        async with httpx.AsyncClient(timeout=20) as c:
+            r = await c.get("https://atlas.microsoft.com/route/directions/json", params=params)
+            r.raise_for_status()
+            rt = r.json()["routes"][0]
+    except (httpx.HTTPError, KeyError, IndexError) as e:
+        log.warning("nav-route failed: %s", e)
+        raise Unavailable("service", "El servicio de rutas no respondió para este modo.", "routing")
+    s = rt["summary"]
+    legs = [{"distance_m": l["summary"]["lengthInMeters"], "duration_s": l["summary"]["travelTimeInSeconds"]} for l in rt["legs"]]
+    steps = [{"text": i.get("message"), "distance_m": i.get("routeOffsetInMeters"), "lat": i["point"]["latitude"], "lng": i["point"]["longitude"]}
+             for i in rt.get("guidance", {}).get("instructions", [])]
+    return {"mode": mode, "distance_m": s["lengthInMeters"], "duration_s": s["travelTimeInSeconds"], "delay_s": s.get("trafficDelayInSeconds", 0),
+            "arrival": s.get("arrivalTime"), "legs": legs, "steps": steps, "provider": "azure_maps",
+            "geometry": [[p["latitude"], p["longitude"]] for leg in rt["legs"] for p in leg["points"]]}
+
+
+class AlongBody(BaseModel):
+    geometry: list[list[float]]
+    category: str  # cafe | ev | fuel | rest | parking
+
+
+CATS = {"cafe": "CAFE_PUB", "ev": "ELECTRIC_VEHICLE_STATION", "fuel": "PETROL_STATION", "rest": "REST_AREA", "parking": "OPEN_PARKING_AREA"}
+
+
+@router.post("/along-route")
+async def along_route(body: AlongBody, user=Depends(current_user)):
+    if not AZURE_MAPS_KEY:
+        raise Unavailable("service", "Puntos en ruta requieren Azure Maps.", "places")
+    if body.category not in CATS:
+        raise Unavailable("service", "Categoría no disponible (WC no existe como categoría fiable).", "places")
+    step = max(1, len(body.geometry) // 90)
+    pts = body.geometry[::step] or body.geometry
+    payload = {"route": {"type": "LineString", "coordinates": [[p[1], p[0]] for p in pts]}}
+    try:
+        async with httpx.AsyncClient(timeout=15) as c:
+            r = await c.post("https://atlas.microsoft.com/search/alongRoute/json",
+                             params={"api-version": "1.0", "subscription-key": AZURE_MAPS_KEY, "query": CATS[body.category], "maxDetourTime": 300, "limit": 12, "language": "es-ES"},
+                             json=payload)
+            r.raise_for_status()
+    except httpx.HTTPError as e:
+        log.warning("along-route failed: %s", e)
+        raise Unavailable("service", "La búsqueda en ruta no respondió.", "places")
+    return [{"name": i.get("poi", {}).get("name") or i["address"].get("freeformAddress"), "lat": i["position"]["lat"], "lng": i["position"]["lon"],
+             "detour_s": i.get("detourTime"), "category": body.category} for i in r.json().get("results", [])]
+
+
+class HistoryBody(BaseModel):
+    name: str
+    lat: float
+    lng: float
+
+
+@router.get("/history")
+async def nav_history(lat: _Opt[float] = None, lng: _Opt[float] = None, user=Depends(current_user)):
+    """Recent destinations, nearest first when a position is given."""
+    import math
+    cur = _db.nav_history.find({"user_id": str(user["_id"])}).sort("at", -1)
+    items = [{"name": h["name"], "lat": h["lat"], "lng": h["lng"], "at": h["at"].isoformat()} for h in await cur.to_list(30)]
+    seen, uniq = set(), []
+    for i in items:
+        if i["name"] not in seen:
+            seen.add(i["name"]); uniq.append(i)
+    if lat is not None and lng is not None:
+        for i in uniq:
+            i["distance_m"] = 2 * 6371000 * math.asin(math.sqrt(math.sin(math.radians(i["lat"] - lat) / 2) ** 2 + math.cos(math.radians(lat)) * math.cos(math.radians(i["lat"])) * math.sin(math.radians(i["lng"] - lng) / 2) ** 2))
+        uniq.sort(key=lambda i: i["distance_m"])
+    return uniq[:8]
+
+
+@router.post("/history", status_code=201)
+async def add_history(body: HistoryBody, user=Depends(current_user)):
+    await _db.nav_history.insert_one({**body.model_dump(), "user_id": str(user["_id"]), "at": _now()})
+    return {"ok": True}
+
+
+@router.get("/reverse")
+async def reverse_geocode(lat: float, lng: float, user=Depends(current_user)):
+    """Address of a tapped map point (Azure reverse geocoding)."""
+    import math
+    if math.isnan(lat) or math.isnan(lng):
+        raise Unavailable("service", "Coordenadas no válidas.", "geocoding")
+    if not AZURE_MAPS_KEY:
+        raise Unavailable("service", "La dirección del punto requiere Azure Maps.", "geocoding")
+    try:
+        async with httpx.AsyncClient(timeout=8) as c:
+            r = await c.get("https://atlas.microsoft.com/search/address/reverse/json",
+                            params={"api-version": "1.0", "subscription-key": AZURE_MAPS_KEY, "query": f"{lat},{lng}", "language": "es-ES"})
+            r.raise_for_status()
+    except httpx.HTTPError as e:
+        log.warning("reverse failed: %s", e)
+        raise Unavailable("service", "La geocodificación inversa no respondió.", "geocoding")
+    items = r.json().get("addresses", [])
+    a = items[0]["address"] if items else {}
+    name = a.get("freeformAddress") or f"{lat:.5f}, {lng:.5f}"
+    return {"name": name, "street": a.get("streetName"), "number": a.get("streetNumber"), "municipality": a.get("municipality"),
+            "lat": lat, "lng": lng, "has_number": True}
+
+
 @router.get("/providers")
 async def providers():
     return provider_status()

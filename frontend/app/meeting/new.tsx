@@ -11,15 +11,16 @@ import { Button, Header, showUnavailable, T, toast } from "@/src/components/ui";
 import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
 export default function NewMeeting() {
-  const { group, mode } = useLocalSearchParams<{ group: string; mode?: string }>();
+  const { group, mode, lat, lng, place } = useLocalSearchParams<{ group: string; mode?: string; lat?: string; lng?: string; place?: string }>();
+  const prefill = lat && lng && !Number.isNaN(Number(lat)) ? { name: place ?? `${lat}, ${lng}`, lat: Number(lat), lng: Number(lng) } : null;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const s = useStyles();
   const { colors } = useTheme();
   const [name, setName] = useState(mode === "navigate" ? "Destino" : "Quedada");
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(prefill?.name ?? "");
   const [command, setCommand] = useState("");
-  const [picked, setPicked] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [picked, setPicked] = useState<{ name: string; lat: number; lng: number } | null>(prefill);
   const [searchQ, setSearchQ] = useState("");
   const results = useQuery({ queryKey: ["geocode", searchQ], enabled: searchQ.length > 2, queryFn: () => api<any[]>(`/mobility/geocode?q=${encodeURIComponent(searchQ)}`) });
   const providers = useQuery({ queryKey: ["system-status"], queryFn: () => api<any>("/system/status") });

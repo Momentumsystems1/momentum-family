@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api } from "@/src/api";
 import { PersonAvatar } from "@/src/components/orbs";
-import { Header, Pill, showUnavailable, T, toast } from "@/src/components/ui";
+import { Header, Pill, T, toast } from "@/src/components/ui";
 import { PERSON_ACTIONS } from "@/src/copy";
 import { makeStyles, radius, spacing, useTheme } from "@/src/theme";
 
@@ -28,13 +28,12 @@ export default function Person() {
   const run = async (key: string) => {
     switch (key) {
       case "estado": return toast(p?.state === "shared" ? `Estado: ${p.status ?? "no compartido"} · ${p.mobility_mode ?? "modo desconocido"} · ${new Date(p.at).toLocaleTimeString("es-ES")}` : p?.label ?? "Ubicación no compartida");
-      case "eta": case "reunirse": return router.push({ pathname: "/meeting/new", params: { group } });
-      case "seguir": case "ir_hasta": case "camino_casa": return p?.state === "shared" ? router.push({ pathname: "/convoy/new", params: { group, lat: String(p.lat), lng: String(p.lng), place: name } }) : toast("Esta persona no comparte ubicación");
+      case "reunirse": return router.push({ pathname: "/meeting/new", params: { group } });
+      case "ir_hasta": return p?.state === "shared" ? router.push({ pathname: "/navigate", params: { lat: String(p.lat), lng: String(p.lng), place: name } }) : toast("Esta persona no comparte ubicación");
+      case "seguir": return p?.state === "shared" ? router.push({ pathname: "/convoy/new", params: { group, lat: String(p.lat), lng: String(p.lng), place: name } }) : toast("Esta persona no comparte ubicación");
       case "todo_bien": case "incidencia":
         try { await api("/events", { method: "POST", json: { group_id: group, kind: key === "todo_bien" ? "checkin" : "incident", severity: key === "todo_bien" ? "info" : "warning", target_user_id: p?.user_id ?? m?.user_id, message: key === "todo_bien" ? `¿Todo bien, ${name}?` : `Incidencia relacionada con ${name}` } }); return toast("Enviado al grupo con trazabilidad", "success"); } catch (e: any) { return toast(e.message, "error"); }
       case "mensaje": return Linking.openURL(`sms:?&body=${encodeURIComponent(`Hola ${name}, te escribo desde Sentinel.`)}`).catch(() => toast("Mensajes no disponible"));
-      case "llamar": return toast("Sin número de teléfono asociado: Sentinel no solicita el teléfono en el perfil");
-      case "camara": return showUnavailable({ code: "SERVICE_NOT_CONFIGURED", title: "SERVICIO NO CONFIGURADO", reason: "La cámara compartida requiere consentimiento explícito de la persona y transporte WebRTC (build nativa)." });
       case "comparticion": return router.push("/privacy");
       case "actividad": return router.push(`/group/${group}?tab=events`);
       default: return toast("Función en preparación");
