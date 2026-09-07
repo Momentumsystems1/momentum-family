@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 
+import { supabase } from "@/src/supabase";
 import { storage } from "@/src/utils/storage";
 
 export const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
@@ -61,18 +62,15 @@ async function parse(r: Response) {
 }
 
 async function refresh(): Promise<boolean> {
+  // Supabase owns the session lifecycle; ask it for a fresh access token.
   const t = await loadTokens();
   if (!t) return false;
-  const r = await fetch(`${BASE}/auth/refresh`, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: t.refresh_token }),
-  });
-  if (!r.ok) {
+  const { data, error } = await supabase.auth.refreshSession({ refresh_token: t.refresh_token });
+  if (error || !data.session) {
     await saveTokens(null);
     return false;
   }
-  const next = await r.json();
-  await saveTokens({ access_token: next.access_token, refresh_token: next.refresh_token });
+  await saveTokens({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
   return true;
 }
 

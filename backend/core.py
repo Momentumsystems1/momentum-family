@@ -25,6 +25,8 @@ REFRESH_DAYS = int(os.environ["REFRESH_DAYS"])
 AZURE_MAPS_KEY = os.environ.get("AZURE_MAPS_KEY", "").strip()
 APP_PUBLIC_URL = os.environ["APP_PUBLIC_URL"].rstrip("/")
 TERMS_VERSION = os.environ["TERMS_VERSION"]
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 ALGO = "HS256"
 
 bearer = HTTPBearer(auto_error=False)
@@ -75,9 +77,56 @@ def serialize(doc: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+async def _supabase_user(token: str) -> Optional[dict[str, Any]]:
+    """Resolve a Supabase access token to the app user doc (Mongo).
+
+    Verification goes through Supabase Auth's /auth/v1/user endpoint, so it works
+    regardless of the project's JWT signing algorithm. On first login the app user
+    document is provisioned automatically, keyed by the Supabase user id.
+    """
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as cli:
+            r = await cli.get(
+                f"{SUPABASE_URL}/auth/v1/user",
+                headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {token}"},
+            )
+    except httpx.HTTPError:
+        raise HTTPException(503, "Servicio de autenticación no disponible")
+    if r.status_code != 200:
+        return None
+    su = r.json()
+    supa_id, email = su.get("id"), (su.get("email") or "").lower()
+    if not supa_id or not email:
+        return None
+    user = await db.users.find_one({"supabase_id": supa_id, "deleted_at": None})
+    if user:
+        return user
+    legacy = await db.users.find_one({"email": email, "deleted_at": None})
+    if legacy:
+        await db.users.update_one({"_id": legacy["_id"]}, {"$set": {"supabase_id": supa_id}})
+        legacy["supabase_id"] = supa_id
+        return legacy
+    doc = {
+        "supabase_id": supa_id, "email": email, "created_at": now(), "deleted_at": None,
+        "language": "es", "plan": "free", "account_role": "owner",
+        "delegated_permissions": [], "onboarding": {"completed": False, "step": "consent"},
+        "profile": None, "avatar": {"color": "#22D3EE", "symbol": "pin", "outline": "solid"},
+    }
+    res = await db.users.insert_one(doc)
+    doc["_id"] = res.inserted_id
+    return doc
+
+
 async def current_user(creds: HTTPAuthorizationCredentials = Depends(bearer)) -> dict[str, Any]:
     if creds is None:
         raise HTTPException(401, "Sesión no iniciada")
+    if SUPABASE_URL and SUPABASE_ANON_KEY:
+        user = await _supabase_user(creds.credentials)
+        if not user:
+            raise HTTPException(401, "Sesión no válida o expirada")
+        return user
     try:
         payload = jwt.decode(creds.credentials, JWT_SECRET, algorithms=[ALGO])
         if payload.get("type") != "access":

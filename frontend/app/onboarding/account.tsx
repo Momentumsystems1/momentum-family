@@ -46,7 +46,7 @@ export default function Account() {
           <TextInput testID="account-email-input" style={s.input} placeholder="Email" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="email-address" autoComplete="email" value={email} onChangeText={setEmail} />
           <TextInput testID="account-password-input" style={s.input} placeholder="Contraseña (mínimo 8 caracteres)" placeholderTextColor={colors.muted} secureTextEntry value={password} onChangeText={setPassword} autoComplete={mode === "register" ? "new-password" : "password"} />
           <Pressable disabled style={s.providers} testID="account-social-providers">
-            <T style={{ color: colors.muted, fontSize: 12 }}>Google · Microsoft · Supabase: SERVICIO NO CONFIGURADO (pendiente de credenciales)</T>
+            <T style={{ color: colors.muted, fontSize: 12 }}>Acceso con tu email y contraseña. Google · Microsoft: pendiente de credenciales.</T>
           </Pressable>
         </View>
       </OnboardingScreen>
