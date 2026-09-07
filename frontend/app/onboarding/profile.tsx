@@ -7,6 +7,7 @@ import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 
 import { api } from "@/src/api";
 import { useAuth } from "@/src/auth";
+import { pickAndUploadAvatar } from "@/src/avatarPhoto";
 import { OnboardingScreen } from "@/src/components/OnboardingScreen";
 import { PersonAvatar } from "@/src/components/orbs";
 import { T, toast } from "@/src/components/ui";
@@ -22,13 +23,25 @@ export default function Profile() {
   const [surname, setSurname] = useState(user?.profile?.surname ?? "");
   const [color, setColor] = useState(user?.avatar?.color ?? AVATAR_COLORS[0]);
   const [symbol, setSymbol] = useState(user?.avatar?.symbol ?? "pin");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(user?.avatar?.photo_url ?? null);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const pickPhoto = async () => {
+    setPhotoBusy(true);
+    try {
+      const url = await pickAndUploadAvatar();
+      if (url) setPhotoUrl(url);
+    } catch (e: any) {
+      toast(e?.message ?? "No se pudo subir la foto", "error");
+    } finally { setPhotoBusy(false); }
+  };
 
   const save = async () => {
     setLoading(true);
     try {
       await api("/profile", { method: "PUT", json: { name: name.trim(), surname: surname.trim() || null, language: "es" } });
-      await api("/profile/avatar", { method: "PUT", json: { color, symbol, outline: "solid" } });
+      await api("/profile/avatar", { method: "PUT", json: { color, symbol, outline: "solid", photo_url: photoUrl } });
       await reload();
       router.replace("/onboarding/group");
     } catch (e: any) { toast(e?.message ?? "No se pudo guardar el perfil", "error"); } finally { setLoading(false); }
@@ -39,7 +52,12 @@ export default function Profile() {
       <OnboardingScreen step="profile" testID="onboarding-profile" title="Tu identidad en el mapa" body="Solo pedimos lo necesario. Tu avatar combina un símbolo de geolocalización con tu inicial o foto en la esquina superior derecha."
         primary="Continuar" onPrimary={save} loading={loading} primaryDisabled={name.trim().length < 1}>
         <View style={{ alignItems: "center", marginBottom: spacing.xl }} testID="avatar-preview">
-          <PersonAvatar name={name || "?"} color={color} size={72} symbol={symbol} />
+          <Pressable testID="avatar-photo-pick" onPress={pickPhoto} disabled={photoBusy} accessibilityLabel="Subir foto de perfil">
+            <PersonAvatar name={name || "?"} color={color} size={72} symbol={symbol} photoUrl={photoUrl} />
+            <View style={{ position: "absolute", right: -2, bottom: 2, width: 24, height: 24, borderRadius: 12, backgroundColor: colors.brandPrimary, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.surface }}>
+              <Ionicons name={photoBusy ? "hourglass" : "camera"} size={12} color={colors.onBrandPrimary} />
+            </View>
+          </Pressable>
         </View>
         <View style={{ gap: spacing.md }}>
           <TextInput testID="profile-name-input" style={s.input} placeholder="Nombre" placeholderTextColor={colors.muted} value={name} onChangeText={setName} />
@@ -60,7 +78,7 @@ export default function Profile() {
               </Pressable>
             ))}
           </View>
-          <T style={{ color: colors.muted, fontSize: 12, marginTop: spacing.sm }}>Foto e ilustración personalizada: SERVICIO NO CONFIGURADO (almacenamiento de imágenes pendiente). Formatos previstos: PNG/JPG, 1:1, 512×512 px, máx. 2 MB, con transparencia.</T>
+          <T style={{ color: colors.muted, fontSize: 12, marginTop: spacing.sm }}>Toca el círculo para subir tu foto (PNG/JPG, recorte 1:1). También puedes usar solo tu inicial.</T>
         </View>
       </OnboardingScreen>
     </KeyboardAvoidingView>

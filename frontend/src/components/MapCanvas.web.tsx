@@ -36,7 +36,7 @@ export function MapCanvas({ people, pins = [], onPersonPress, onMapPress, select
       ))}
       {located.map((p) => (
         <Pressable key={p.member_id} testID={`map-person-${p.member_id}`} onPress={() => onPersonPress?.(p)} style={[s.abs, proj(p.lat!, p.lng!) as any]}>
-          <PersonAvatar name={p.name} color={p.color} state="shared" />
+          <PersonAvatar name={p.name} color={p.color} state="shared" photoUrl={p.photo_url} />
           <Text style={s.pinTxt}>{p.name}</Text>
         </Pressable>
       ))}

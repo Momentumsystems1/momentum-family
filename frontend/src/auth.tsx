@@ -11,7 +11,7 @@ export type User = {
   plan: string;
   account_role: string;
   profile: { name: string; surname?: string | null } | null;
-  avatar: { color: string; symbol: string; outline: string };
+  avatar: { color: string; symbol: string; outline: string; photo_url?: string | null };
   onboarding: { completed: boolean; step: string };
 };
 

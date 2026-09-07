@@ -22,6 +22,7 @@ class AvatarBody(BaseModel):
     color: str
     symbol: str = "pin"  # pin | shield | car | star | heart
     outline: str = "solid"
+    photo_url: Optional[str] = None
 
 
 @router.put("/profile")
@@ -36,7 +37,7 @@ async def set_profile(body: ProfileBody, user=Depends(current_user)):
 @router.put("/profile/avatar")
 async def set_avatar(body: AvatarBody, user=Depends(current_user)):
     await db.users.update_one({"_id": user["_id"]}, {"$set": {"avatar": body.model_dump()}})
-    await db.members.update_many({"user_id": str(user["_id"])}, {"$set": {"color": body.color}})
+    await db.members.update_many({"user_id": str(user["_id"])}, {"$set": {"color": body.color, "photo_url": body.photo_url}})
     return public_user(await db.users.find_one({"_id": user["_id"]}))
 
 
@@ -92,7 +93,7 @@ async def group_positions(group_id: str, user=Depends(current_user)):
         exact = is_granted(eff, "exact_location", group_id)
         approx = is_granted(eff, "approx_location", group_id)
         base = {"member_id": str(m["_id"]), "user_id": m["user_id"], "name": m["display_name"], "color": m["color"],
-                "role": m["role"], "is_me": m["user_id"] == viewer}
+                "role": m["role"], "is_me": m["user_id"] == viewer, "photo_url": m.get("photo_url")}
         pos = await db.positions_latest.find_one({"user_id": m["user_id"]})
         if not (exact or approx):
             out.append({**base, "state": "not_shared", "label": "Ubicación no compartida"})

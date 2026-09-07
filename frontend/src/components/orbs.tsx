@@ -1,5 +1,6 @@
 // Group Mini-Orb (living object), Person avatar (geolocation symbol + small photo/initial at upper-right), Privacy flip card.
 import Ionicons from "@react-native-vector-icons/ionicons";
+import { Image } from "expo-image";
 import React, { useEffect } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming } from "react-native-reanimated";
@@ -39,7 +40,7 @@ const useMiniStyles = makeStyles((c) => ({
   name: { fontFamily: fonts.semibold, fontSize: 11, color: c.onSurface, marginTop: 4, maxWidth: 80 },
 }));
 
-export function PersonAvatar({ name, color, size = 44, state = "shared", symbol = "pin" }: { name: string; color: string; size?: number; state?: "shared" | "not_shared" | "permission_pending" | "pending_invitation"; symbol?: string }) {
+export function PersonAvatar({ name, color, size = 44, state = "shared", symbol = "pin", photoUrl }: { name: string; color: string; size?: number; state?: "shared" | "not_shared" | "permission_pending" | "pending_invitation"; symbol?: string; photoUrl?: string | null }) {
   const { colors } = useTheme();
   const dim = state !== "shared";
   const bg = dim ? colors.pending : color;
@@ -51,8 +52,12 @@ export function PersonAvatar({ name, color, size = 44, state = "shared", symbol 
         borderWidth: 2, borderColor: colors.glassStrong, shadowColor: colors.surfaceInverse, shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4 }}>
         <Ionicons name={icon} size={size * 0.5} color={dim ? colors.onPending : colors.onBrandPrimary} />
       </View>
-      <View style={{ position: "absolute", right: 0, top: 0, width: photo, height: photo, borderRadius: photo / 2, backgroundColor: colors.surfaceSecondary, borderWidth: 2, borderColor: color, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ fontFamily: fonts.bold, fontSize: photo * 0.45, color: colors.onSurface }}>{(name || "?").charAt(0).toUpperCase()}</Text>
+      <View style={{ position: "absolute", right: 0, top: 0, width: photo, height: photo, borderRadius: photo / 2, backgroundColor: colors.surfaceSecondary, borderWidth: 2, borderColor: color, alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+        {photoUrl ? (
+          <Image source={{ uri: photoUrl }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={120} />
+        ) : (
+          <Text style={{ fontFamily: fonts.bold, fontSize: photo * 0.45, color: colors.onSurface }}>{(name || "?").charAt(0).toUpperCase()}</Text>
+        )}
       </View>
     </View>
   );

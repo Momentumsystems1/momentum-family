@@ -7,6 +7,7 @@
 // ============================================================
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -98,8 +99,12 @@ export default function MapHome() {
             <Ionicons name="people" size={18} color={colors.onSurface} />
             {pendingCount ? <View style={s.badge}><T weight="bold" style={{ fontSize: 9, color: colors.onPending }}>{pendingCount}</T></View> : null}
           </Pressable>
-          <Pressable testID="profile-shortcut" onPress={() => { closeAll(); router.push("/profile"); }} style={[s.barIcon, s.avatar]} accessibilityLabel="Perfil">
-            <T weight="bold" style={{ fontSize: 13, color: colors.onBrandPrimary }}>{(name || "?").charAt(0).toUpperCase()}</T>
+          <Pressable testID="profile-shortcut" onPress={() => { closeAll(); router.push("/profile"); }} style={[s.barIcon, s.avatar, { overflow: "hidden" }]} accessibilityLabel="Perfil">
+            {user?.avatar?.photo_url ? (
+              <Image source={{ uri: user.avatar.photo_url }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={120} />
+            ) : (
+              <T weight="bold" style={{ fontSize: 13, color: colors.onBrandPrimary }}>{(name || "?").charAt(0).toUpperCase()}</T>
+            )}
           </Pressable>
         </View>
         {locBanner && sharesLocation && loc.perm !== "granted" ? (

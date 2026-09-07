@@ -31,7 +31,7 @@ export default function ProfileScreen() {
     <View style={s.root} testID="profile-screen">
       <Header title="Perfil y sistema" />
       <KeyboardAwareScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: insets.bottom + spacing.xl, gap: spacing.md }} bottomOffset={24}>
-        <View style={{ alignItems: "center" }}><PersonAvatar name={name || "?"} color={color} size={72} symbol={user?.avatar?.symbol} /></View>
+        <View style={{ alignItems: "center" }}><PersonAvatar name={name || "?"} color={color} size={72} symbol={user?.avatar?.symbol} photoUrl={user?.avatar?.photo_url} /></View>
         <TextInput testID="profile-edit-name" style={s.input} value={name} onChangeText={setName} placeholder="Nombre" placeholderTextColor={colors.muted} />
         <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>{AVATAR_COLORS.map((c) => <Pressable key={c} testID={`profile-color-${c.replace("#", "")}`} onPress={() => setColor(c)} style={[s.swatch, { backgroundColor: c }, color === c && { borderColor: colors.onSurface }]} />)}</View>
         <Button testID="profile-save" title="Guardar" onPress={() => save.mutate()} loading={save.isPending} disabled={!name.trim()} />

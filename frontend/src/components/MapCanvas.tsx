@@ -6,7 +6,7 @@ import MapView, { Marker, Polyline } from "react-native-maps";
 import { PersonAvatar } from "@/src/components/orbs";
 import { useTheme } from "@/src/theme";
 
-export type MapPerson = { member_id: string; user_id: string; name: string; color: string; state: string; lat?: number; lng?: number; is_me?: boolean; label?: string; precision?: string; at?: string; status?: string | null };
+export type MapPerson = { member_id: string; user_id: string; name: string; color: string; state: string; lat?: number; lng?: number; is_me?: boolean; label?: string; precision?: string; at?: string; status?: string | null; photo_url?: string | null };
 export type MapPin = { id: string; lat: number; lng: number; title: string; color?: string };
 export type LatLng = { lat: number; lng: number };
 
@@ -58,7 +58,7 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
         onLongPress={(e) => onMapLongPress?.(coord(e))}>
         {located.map((p) => (
           <Marker key={p.member_id} coordinate={{ latitude: p.lat!, longitude: p.lng! }} onPress={() => onPersonPress?.(p)} anchor={{ x: 0.4, y: 0.6 }} testID={`map-person-${p.member_id}`}>
-            <PersonAvatar name={p.name} color={p.color} state="shared" size={p.is_me ? 50 : 42} />
+            <PersonAvatar name={p.name} color={p.color} state="shared" size={p.is_me ? 50 : 42} photoUrl={p.photo_url} />
           </Marker>
         ))}
         {pins.map((p) => <Marker key={p.id} coordinate={{ latitude: p.lat, longitude: p.lng }} title={p.title} pinColor={p.color ?? colors.brandSecondary} />)}
