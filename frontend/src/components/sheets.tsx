@@ -1,7 +1,7 @@
 // Bottom sheet flows shared by group creation and group detail: add member, pending member detail.
 import Ionicons from "@react-native-vector-icons/ionicons";
 import React, { useState } from "react";
-import { Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -23,20 +23,43 @@ export function Sheet({ visible, onClose, children, testID }: { visible: boolean
   );
 }
 
-export type NewInvite = { name: string; membership: "fixed" | "temporary"; channel: "whatsapp" | "sms"; duration_hours?: number };
+export type NewInvite = { name: string; membership: "fixed" | "temporary"; channel: "whatsapp" | "sms"; duration_hours?: number; phone?: string };
 
 export function AddMemberSheet({ visible, onClose, onSubmit, loading }: { visible: boolean; onClose: () => void; onSubmit: (v: NewInvite) => void; loading: boolean }) {
   const s = useStyles();
   const { colors } = useTheme();
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [membership, setMembership] = useState<"fixed" | "temporary">("fixed");
   const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [hours, setHours] = useState(24);
-  const reset = () => { setName(""); setMembership("fixed"); setChannel("whatsapp"); setHours(24); };
+  const reset = () => { setName(""); setPhone(""); setMembership("fixed"); setChannel("whatsapp"); setHours(24); };
+
+  // Contact Picker API (Chrome/Edge en Android y escritorio): elige el contacto del teléfono
+  // y la invitación abre el chat directo de WhatsApp con esa persona.
+  const canPickContact = Platform.OS === "web" && typeof navigator !== "undefined" && "contacts" in (navigator as any);
+  const pickContact = async () => {
+    try {
+      const [c] = await (navigator as any).contacts.select(["name", "tel"], { multiple: false });
+      if (!c) return;
+      if (c.name?.[0]) setName(c.name[0]);
+      if (c.tel?.[0]) setPhone(String(c.tel[0]).replace(/[^0-9+]/g, ""));
+    } catch { /* usuario canceló el selector */ }
+  };
+
   return (
     <Sheet visible={visible} onClose={onClose} testID="add-member-sheet">
       <T weight="bold" style={{ fontSize: 20 }}>Añadir persona</T>
       <TextInput testID="add-member-name-input" style={s.input} placeholder="Nombre" placeholderTextColor={colors.muted} value={name} onChangeText={setName} autoFocus />
+      <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm, alignItems: "center" }}>
+        <TextInput testID="add-member-phone-input" style={[s.input, { flex: 1, marginTop: 0 }]} placeholder="Teléfono (opcional, chat directo)" placeholderTextColor={colors.muted} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+        {canPickContact ? (
+          <Pressable testID="add-member-pick-contact" onPress={pickContact} style={[s.chip, s.chipOn]}>
+            <Ionicons name="people" size={16} color={colors.onBrandPrimary} />
+            <T weight="semibold" style={{ fontSize: 13, color: colors.onBrandPrimary }}>Contactos</T>
+          </Pressable>
+        ) : null}
+      </View>
       <T weight="semibold" style={{ marginTop: spacing.lg }}>¿Cómo participará esta persona?</T>
       <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
         <Option testID="membership-fixed" active={membership === "fixed"} onPress={() => setMembership("fixed")} title="Miembro fijo" sub="Sin expiración automática" icon="infinite" />
@@ -59,7 +82,7 @@ export function AddMemberSheet({ visible, onClose, onSubmit, loading }: { visibl
       <T style={{ color: colors.muted, fontSize: 12, marginTop: spacing.md }}>Sentinel no puede confirmar la entrega del mensaje: mostrará “Invitación preparada” hasta que la persona acepte.</T>
       <View style={{ marginTop: spacing.lg }}>
         <Button testID="add-member-submit" title="Crear invitación" loading={loading} disabled={name.trim().length < 1}
-          onPress={() => { onSubmit({ name: name.trim(), membership, channel, duration_hours: membership === "temporary" ? hours : undefined }); reset(); }} />
+          onPress={() => { onSubmit({ name: name.trim(), membership, channel, duration_hours: membership === "temporary" ? hours : undefined, phone: phone.trim() || undefined }); reset(); }} />
       </View>
     </Sheet>
   );

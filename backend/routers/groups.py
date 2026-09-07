@@ -28,6 +28,7 @@ class InviteCreate(BaseModel):
     name: str
     membership: str  # fixed | temporary
     channel: str  # whatsapp | sms
+    phone: Optional[str] = None
     expires_at: Optional[datetime] = None
     duration_hours: Optional[int] = None
     responsible_adult_required: bool = False
@@ -64,7 +65,7 @@ async def group_view(g: dict, viewer_id: str) -> dict:
     for m in members:
         inv = invitations.get(m.get("invitation_id") or "")
         if inv:
-            m["invitation"] = {k: inv.get(k) for k in ("status", "channel", "created_at", "dispatched_at", "link", "token", "id")}
+            m["invitation"] = {k: inv.get(k) for k in ("status", "channel", "phone", "created_at", "dispatched_at", "link", "token", "id")}
         if m.get("user_id"):
             eff = await effective_permissions(m["user_id"])
             m["shares_location"] = is_granted(eff, "exact_location", gid) or is_granted(eff, "approx_location", gid)
@@ -158,7 +159,7 @@ async def invite(group_id: str, body: InviteCreate, user=Depends(current_user)):
             raise HTTPException(400, "Un invitado temporal requiere fecha de expiración o duración")
     token = secrets.token_urlsafe(24)
     inv = {"group_id": group_id, "group_name": g["name"], "name": body.name.strip(), "membership": body.membership,
-           "channel": body.channel, "token": token, "status": "prepared", "invited_by": str(user["_id"]),
+           "channel": body.channel, "phone": body.phone, "token": token, "status": "prepared", "invited_by": str(user["_id"]),
            "created_at": now(), "dispatched_at": None, "expires_at": expires,
            "responsible_adult_required": body.responsible_adult_required, "permissions": body.permissions,
            "link": f"{APP_PUBLIC_URL}/invite/{token}"}
