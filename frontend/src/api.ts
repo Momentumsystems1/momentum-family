@@ -77,6 +77,9 @@ async function refresh(): Promise<boolean> {
 export async function api<T = any>(path: string, init: RequestInit & { json?: any; auth?: boolean } = {}): Promise<T> {
   const { json, auth = true, ...rest } = init;
   const headers: Record<string, string> = { ...(rest.headers as any), "Content-Type": "application/json" };
+  // TEMP (preproducción): con el backend tras localtunnel, esta cabecera evita su página
+  // intersticial 511 en los fetch del navegador. Quitar al alojar el backend en dominio propio.
+  if (BASE.includes("loca.lt")) headers["bypass-tunnel-reminder"] = "1";
   const doFetch = async () => {
     if (auth && access) headers.Authorization = `Bearer ${access}`;
     return fetch(`${BASE}${path}`, { ...rest, headers, body: json !== undefined ? JSON.stringify(json) : rest.body });
