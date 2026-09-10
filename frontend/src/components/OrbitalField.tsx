@@ -3,7 +3,7 @@
 import Ionicons from "@react-native-vector-icons/ionicons";
 import React, { useEffect, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
-import Animated, { Easing, useAnimatedStyle, useDerivedValue, useFrameCallback, useSharedValue, withDelay, withSequence, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, SharedValue, useAnimatedStyle, useDerivedValue, useFrameCallback, useSharedValue, withDelay, withSequence, withSpring, withTiming } from "react-native-reanimated";
 
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
@@ -61,7 +61,7 @@ export function OrbitalField({ members, size, phase, onMemberPress, center, grou
   );
 }
 
-function OrbitAvatar({ m, angle, target, r, center, onPress, collapsing }: { m: OrbitalMember; angle: Animated.SharedValue<number>; target: number; r: number; center: number; onPress?: (m: OrbitalMember) => void; collapsing: boolean }) {
+function OrbitAvatar({ m, angle, target, r, center, onPress, collapsing }: { m: OrbitalMember; angle: SharedValue<number>; target: number; r: number; center: number; onPress?: (m: OrbitalMember) => void; collapsing: boolean }) {
   const s = useStyles();
   const { colors } = useTheme();
   const radius = useSharedValue(m.isNew ? 0 : r);
@@ -109,7 +109,7 @@ function OrbitAvatar({ m, angle, target, r, center, onPress, collapsing }: { m: 
   );
 }
 
-function FormationLink({ angle, target, r, center, opacity, color, collapsing }: { angle: Animated.SharedValue<number>; target: number; r: number; center: number; opacity: Animated.SharedValue<number>; color: string; collapsing: boolean }) {
+function FormationLink({ angle, target, r, center, opacity, color, collapsing }: { angle: SharedValue<number>; target: number; r: number; center: number; opacity: SharedValue<number>; color: string; collapsing: boolean }) {
   const len = useSharedValue(r);
   useEffect(() => { if (collapsing) len.value = withTiming(0, { duration: 700 }); }, [collapsing, len]);
   const style = useAnimatedStyle(() => ({
