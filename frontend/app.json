@@ -61,6 +61,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "owner": "momentumsystemss-team",
+    "extra": {
+      "eas": {
+        "projectId": "adb3ceea-e116-4fd1-a56f-da3a01b3f410"
+      }
     }
   }
 }
