@@ -3,6 +3,12 @@
     "name": "Sentinel Family",
     "slug": "sentinel-family",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/23176eaf-b779-4840-8f1e-f7f7e6d5d9fe"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sentinel",
