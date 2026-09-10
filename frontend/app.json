@@ -9,7 +9,7 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.emergent.sentinelaudit.chvfyq",
+      "bundleIdentifier": "com.momentumsystems.sentinel",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Compartir tu ubicación con tu grupo",
         "NSCameraUsageDescription": "Grabar incidencias de la vía voluntariamente",
@@ -22,7 +22,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#09101C"
       },
-      "package": "com.emergent.sentinelaudit.chvfyq",
+      "package": "com.momentumsystems.sentinel",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
