@@ -62,10 +62,10 @@
     "experiments": {
       "typedRoutes": true
     },
-    "owner": "momentumsystemss-team",
+    "owner": "dctinvent.com",
     "extra": {
       "eas": {
-        "projectId": "adb3ceea-e116-4fd1-a56f-da3a01b3f410"
+        "projectId": "23176eaf-b779-4840-8f1e-f7f7e6d5d9fe"
       }
     }
   }
