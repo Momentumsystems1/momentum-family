@@ -107,7 +107,7 @@ export const ONBOARDING = {
 };
 
 export const EDUCATION = {
-  miniorb: "Este es tu grupo. Tócalo para ver sus miembros y permisos.",
+  miniorb: "Este es tu grupo. Tócalo para abrir el orbe de miembros.",
   orb: "Este es el Orbe Sentinel. Desde aquí accedes a las herramientas según el contexto.",
   privacy: "Aquí puedes ver exactamente qué compartes y con quién.",
 };

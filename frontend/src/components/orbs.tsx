@@ -6,7 +6,7 @@ import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withSeq
 
 import { fonts, makeStyles, useTheme } from "@/src/theme";
 
-export function MiniOrb({ stats, name, onPress, testID = "group-mini-orb" }: { stats: { members: number; pending: number; alerts: number; meeting: boolean; convoy: boolean }; name: string; onPress: () => void; testID?: string }) {
+export function MiniOrb({ stats = { members: 0, pending: 0, alerts: 0, meeting: false, convoy: false }, name, onPress, testID = "group-mini-orb" }: { stats?: { members: number; pending: number; alerts: number; meeting: boolean; convoy: boolean }; name: string; onPress: () => void; testID?: string }) {
   const s = useMiniStyles();
   const { colors } = useTheme();
   const pulse = useSharedValue(0);

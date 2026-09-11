@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, unavailableOf } from "@/src/api";
 import { useAuth } from "@/src/auth";
-import { OrbitalField } from "@/src/components/OrbitalField";
+import { OrbField } from "@/src/components/OrbField";
 import { AddMemberSheet, MemberInfo, MemberSheet } from "@/src/components/sheets";
 import { Button, Header, Pill, showUnavailable, T, toast } from "@/src/components/ui";
 import { dispatchInvitation } from "@/src/invites";
@@ -66,9 +66,9 @@ export default function GroupDetail() {
         {view === "members" && group ? (
           <>
             <View style={{ alignItems: "center", paddingVertical: spacing.lg }}>
-              <OrbitalField size={size} phase="editing" groupName={group.name}
-                members={group.members.map((m: any) => ({ id: m.id, name: m.display_name, color: m.color, isMe: m.user_id === user?.id, status: m.status === "active" ? "active" : m.status === "declined" ? "declined" : m.status === "expired" ? "expired" : "pending" }))}
-                onMemberPress={(m) => { const full = group.members.find((x: any) => x.id === m.id); if (full) setSelected(full); }} />
+              <OrbField size={size}
+                members={group.members.map((m: any) => ({ id: m.id, name: m.display_name, color: m.color, isMe: m.user_id === user?.id, state: m.status === "active" ? ("ok" as const) : ("pending" as const), stateLabel: m.status === "active" ? undefined : m.status === "declined" ? "Rechazada" : m.status === "expired" ? "Expirada" : "Invitación pendiente" }))}
+                onConfirm={(m) => { const full = group.members.find((x: any) => x.id === m.id); if (full) setSelected(full); }} />
             </View>
             <View style={{ paddingHorizontal: spacing.lg, gap: spacing.sm }}>
               {group.members.map((m: any) => (
