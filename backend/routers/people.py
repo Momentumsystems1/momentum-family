@@ -157,6 +157,16 @@ async def event_action(event_id: str, body: EventAction, user=Depends(current_us
     if not ev:
         raise HTTPException(404, "Evento no encontrado")
     uid = str(user["_id"])
+    # A valid event ID must never allow an unrelated authenticated user to act
+    # on a family's private event. Authorization is checked at action time
+    # (including after a member has been removed from the circle).
+    member = await db.members.find_one({
+        "group_id": ev["group_id"], "user_id": uid, "status": "active",
+    })
+    if not member:
+        raise HTTPException(403, "No perteneces a este grupo")
+    if uid != ev["user_id"] and uid not in ev.get("recipients", []):
+        raise HTTPException(403, "No eres destinatario de este aviso")
     state = {"respond_ok": "resolved", "acknowledge": "acknowledged", "escalate": "escalated", "resolve": "resolved"}.get(body.action)
     if not state:
         raise HTTPException(400, "Acción no válida")
