@@ -48,3 +48,24 @@
 3. Levantar backend real protegido, pruebas de onboarding/círculo/invite/check-in.
 4. APK Android estable + Google Maps real (otra vía de validación, no condiciona A).
 5. Con dos usuarios y mapa funcionando, conectar fuentes NAP/Weather/TomTom y después el módulo de accidentes.
+
+## Resultado de la ejecución — 2026-10-14
+
+**Validación CI real pasada:** [GitHub Actions run 38484471615](https://github.com/Momentumsystems1/momentum-family/actions/runs/38484471615). Se ejecuta `backend/tests/vertical_slice_ci.py` contra un servicio MongoDB temporal real y a través de FastAPI ASGITransport. Tres usuarios de prueba independientes: creación de cuenta/perfil, círculo, invitación preparada y aceptada, evento ¿Todo bien?, lectura y respuesta del invitado, denegación a usuario ajeno y denegación tras retirada. El pipeline también pasó importación backend, TypeScript y exportación web.
+
+**Correcciones implementadas:**
+- Permisos del onboarding desactivados por defecto; evita guardar consentimientos vacíos cuando falla la carga del catálogo.
+- Acción de evento requiere pertenencia activa y ser creador o destinatario; probado que un tercero no puede responder conociendo el ID.
+- Las claves bearer de invitación y teléfonos solo se muestran al administrador del círculo, no a los miembros comunes.
+- El flujo de creación de círculo solo navega al mapa si el backend confirma `/formed`; conserva el nombre introducido.
+- El frontend deja de afirmar que ha enviado un aviso: `delivery_status: not_configured` indica que se registra la actividad pero aún no hay notificación push.
+- Etiquetas principales de inicio de sesión/invitaciones actualizadas a BAYMOVE. Aceptación legal solo si existe evidencia local de aceptación, sin inventar fecha.
+
+**Pendiente (no probado y no debemos llamarlo funcional):**
+- Una sesión real en móvil de dos personas y confirmación de que el receptor recibe una alerta push.
+- Hosting privado accesible del backend y MongoDB con TLS/IAM, protección de datos y copias de seguridad.
+- Una APK Android autónoma con bundle JS, firma estable, clave Maps restringida a paquete/SHA-1 y mapa 2D/3D verificado.
+- GPS real, consentimiento y geolocalización de fondo, rutas, NAP, TomTom y detección de accidentes.
+- La demo HTML offline anterior sigue siendo solo una simulación de UX, no está conectada a los nuevos tests MongoDB.
+
+**Decisión siguiente:** preparar un backend privado de pruebas y dos cuentas reales de QA, y conectarlo después a la primera APK instalable. No desplegar datos personales en servicios públicos sin políticas y controles.
