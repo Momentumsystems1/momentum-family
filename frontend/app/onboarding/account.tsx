@@ -23,10 +23,13 @@ export default function Account() {
   const submit = async () => {
     setLoading(true);
     try {
-      const u = mode === "register" ? await register(email.trim(), password) : await signIn(email.trim(), password);
       const local = await getLocalOnboarding();
-      if (mode === "register" || !u.onboarding?.completed) {
-        await api("/consents", { method: "POST", json: { document: "terms", version: "2026-06-01", accepted: true, accepted_at_client: local.terms_accepted_at ?? new Date().toISOString(), ...clientMeta } }).catch(() => null);
+      if (mode === "register" && !local.terms_accepted_at) {
+        throw new Error("Antes de crear la cuenta debes aceptar las condiciones desde el inicio del onboarding.");
+      }
+      const u = mode === "register" ? await register(email.trim(), password) : await signIn(email.trim(), password);
+      if (local.terms_accepted_at && (mode === "register" || !u.onboarding?.completed)) {
+        await api("/consents", { method: "POST", json: { document: "terms", version: "2026-06-01", accepted: true, accepted_at_client: local.terms_accepted_at, ...clientMeta } });
       }
       await setLocalOnboarding({ step: "consent" });
       if (u.onboarding?.completed) router.replace("/map");
@@ -38,7 +41,7 @@ export default function Account() {
 
   return (
     <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={16} style={{ flex: 1 }}>
-      <OnboardingScreen step="account" testID="onboarding-account" title={mode === "register" ? "Crea tu cuenta Sentinel" : "Inicia sesión en Sentinel"}
+      <OnboardingScreen step="account" testID="onboarding-account" title={mode === "register" ? "Crea tu cuenta BAYMOVE" : "Inicia sesión en BAYMOVE"}
         body="Tu cuenta identifica tus consentimientos, tus grupos y tus permisos. Solo pedimos lo imprescindible."
         primary={mode === "register" ? "Crear cuenta" : "Entrar"} onPrimary={submit} loading={loading} primaryDisabled={!email.includes("@") || password.length < 8}
         secondary={mode === "register" ? "Ya tengo cuenta" : "Crear una cuenta nueva"} onSecondary={() => setMode(mode === "register" ? "login" : "register")} showBack>
