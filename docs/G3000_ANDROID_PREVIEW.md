@@ -3,6 +3,17 @@
 **Estado:** código preparado en la rama `recovery/my-cluster-core-20261013`; compilación Android y GPS nativo aún sin verificar.
 **No publicar ni trasladar a `main` sin aprobación.**
 
+## Expo project existing account binding (14 October 2026)
+- **Existing Expo project** `@dctinvent.com/sentinel-family`, **ID** `23176eaf-b779-4840-8f1e-f7f7e6d5d9fe` (project details confirmed by owner screenshot).
+- This same ID is now recorded at `expo.extra.eas.projectId` and `expo.owner` is `dctinvent.com`; do not call `eas init` to create another project.
+- App display name remains **BAYMOVE**; `expo.slug` stays **sentinel-family** for compatibility with the existing EAS project. Do not change project slug in Expo dashboard without coordinating matching changes in Git.
+- Android application ID remains **com.momentumsystems.baymove**, which is not the same as the historic Sentinel app. It may require a new Android keystore; do not reuse an old app signature blindly.
+- Existing Expo project contains historical OTA updates marked NG8. Its dashboard shows *No development builds yet*, *No production builds yet*. Updates are not proof of successful native APK compilation. Do not reuse OTA channels or auto-publish.
+- GitHub integration must target `Momentumsystems1/momentum-family` with **Base directory** `frontend`; choose only branch `recovery/my-cluster-core-20261013` manually and profile `preview`, not `main` or `production`. GitHub build creation may require first successful local EAS Android build, as documented by Expo.
+- `frontend/eas.json` preview Android image set to `latest`, for GitHub trigger compatibility; no automatic push-to-build or store submission enabled.
+- The Expo GitHub App may limit organization account integration. If connecting fails due to project owner `dctinvent.com` or GitHub account `Momentumsystems1`, stop and review ownership/permissions; no workaround involving sharing personal tokens.
+- **Build secrets:** GitHub Actions secrets, EAS environment variables, and Google Secret Manager are different stores. Actual mobile Maps keys belong in EAS build environment and must be restricted in Google Cloud. No credential value should be pasted into GitHub or chat.
+
 ## Qué se ha integrado
 - Config dinámica de Expo mediante `frontend/app.config.js`: Google Maps para Android/iOS solo si la clave existe en el entorno de compilación, mediante el plugin oficial `react-native-maps`.
 - `G3000_MAPS_ANDROID_API_KEY` y `G3000_MAPS_IOS_API_KEY` son variables **de compilación**, nunca escritas en Git.
@@ -16,7 +27,7 @@
 
 ### A. Vincular BAYMOVE con Expo Application Services (EAS)
 1. Entrar con la cuenta correcta en [expo.dev](https://expo.dev/) y seleccionar o crear el proyecto BAYMOVE.
-2. Desde un clon de esta rama, dentro de `frontend`, iniciar sesión con `npx eas-cli login` y vincular el proyecto con `npx eas-cli init` (requiere acceso autorizado). **No sobrescribir los identificadores iOS/Android de BAYMOVE.**
+2. Desde un clon de esta rama, dentro de `frontend`, iniciar sesión con `npx eas-cli login` y confirmar el ID ya vinculado mediante `npx eas-cli project:info`. **No ejecutar `eas init` para crear un proyecto distinto.**
 3. Para generar la primera firma Android sin exponer la clave aún, compilar con el perfil `preview` sin clave de Maps. Esa primera APK puede mostrar que el mapa no está configurado; su propósito es generar una firma verificable. Comando: `npx eas-cli build -p android --profile preview`.
 4. Una vez generado el Android Keystore por EAS, obtener de las credenciales de EAS la huella SHA-1 **real**; no inventarla ni copiar SHA-1 de otro proyecto. Si se utilizará Google Play App Signing, registrar también su SHA-1 al preparar distribución.
 5. En G3000 → la clave Android, fijar **Android apps** con `com.momentumsystems.baymove` y la huella SHA-1 real; API restriction = únicamente **Maps SDK for Android**.
