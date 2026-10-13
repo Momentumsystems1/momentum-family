@@ -34,7 +34,7 @@ Los cambios **no equivalen a una compilación ni una prueba en dispositivos real
 1. Clonar ESTA rama en el equipo de desarrollo.
 2. Crear `backend/.env` desde `backend/.env.example`, generar `JWT_SECRET` aleatorio y tener MongoDB accesible.
 3. Crear `frontend/.env` desde `frontend/.env.example`. Para dos teléfonos físicos, sustituir la URL de ejemplo por la IP LAN de la máquina que sirve FastAPI.
-4. Arrancar backend: `cd backend && pip install -r requirements.txt && uvicorn server:app --host 0.0.0.0 --port 8000`. **Atención**: `requirements.txt` contiene una dependencia privada heredada de Emergent y puede requerir limpieza para instalarse fuera de esa plataforma.
+4. Arrancar backend: `cd backend && pip install -r requirements-core.txt && uvicorn server:app --host 0.0.0.0 --port 8000`. **Atención**: `requirements.txt` contiene una dependencia privada heredada de Emergent y puede requerir limpieza para instalarse fuera de esa plataforma.
 5. Arrancar frontend: `cd frontend && corepack enable && yarn install --frozen-lockfile && npx expo start`.
 6. Probar iOS/Android con cuentas **de prueba**, permisos de ubicación explícitos y tráfico real de red.
 7. No utilizar claves de producción, datos personales reales ni publicar la app antes de pasar controles.
