@@ -32,6 +32,7 @@ export default function GroupCreation() {
   const [selected, setSelected] = useState<MemberInfo | null>(null);
   const [newIds, setNewIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
+  const finishingRef = useRef(false);
   const nameRef = useRef<TextInput>(null);
 
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api<Group[]>("/groups") });
@@ -69,12 +70,27 @@ export default function GroupCreation() {
   const pendingInvites = (group?.members ?? []).filter((m) => m.status === "pending" && m.invitation?.status === "prepared");
 
   const finish = async () => {
+    if (!group || finishingRef.current || phase !== "editing") return;
+    finishingRef.current = true;
     setPhase("forming");
-    setTimeout(() => setPhase("collapsing"), 1700);
-    setTimeout(async () => {
-      try { await api(`/groups/${group!.id}/formed`, { method: "POST" }); await reload(); } catch (e: any) { toast(e.message, "error"); }
-      router.replace({ pathname: "/map", params: { welcome: "1" } });
-    }, 2900);
+    try {
+      // Wait for the real backend to confirm the circle was saved.
+      // Never enter the map or claim success on an unsuccessful request.
+      const enteredName = (name ?? group.name).trim();
+      if (enteredName && enteredName !== group.name) {
+        await api(`/groups/${group.id}`, { method: "PATCH", json: { name: enteredName } });
+        await qc.invalidateQueries({ queryKey: ["groups"] });
+      }
+      await api(`/groups/${group.id}/formed`, { method: "POST" });
+      await reload();
+      setPhase("collapsing");
+      setTimeout(() => router.replace({ pathname: "/map", params: { welcome: "1" } }), 600);
+    } catch (e: any) {
+      setPhase("editing");
+      toast(e?.message ?? "No se pudo guardar el círculo. Vuelve a intentarlo.", "error");
+    } finally {
+      finishingRef.current = false;
+    }
   };
 
   const sendAll = async () => {
