@@ -46,6 +46,8 @@ jobs:
         run: corepack enable && corepack prepare yarn@1.22.22 --activate
       - name: Restore frontend dependencies
         run: yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Validate native Expo configuration (no keys exposed)
+        run: npx expo config --json > /dev/null
       - name: Check TypeScript
         run: yarn tsc --noEmit
       - name: Compile Expo web preview
