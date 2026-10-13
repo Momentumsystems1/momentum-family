@@ -1,11 +1,16 @@
-// Avatar photo upload — Supabase Storage bucket "avatars" (public read, owner write).
-// Folder rule (enforced by storage RLS): avatars/<supabase_user_id>/<file>.
+// Avatar photo upload is optional and requires Supabase Storage bucket "avatars".
+// This feature must not prevent the rest of the app from booting.
 import * as ImagePicker from "expo-image-picker";
 import { Platform } from "react-native";
 
-import { supabase } from "@/src/supabase";
+import { getSupabase } from "@/src/supabase";
 
 export async function pickAndUploadAvatar(): Promise<string | null> {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Foto de perfil no disponible: almacenamiento de imágenes no configurado.");
+  }
+
   const res = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
     allowsEditing: true,
@@ -17,24 +22,27 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
 
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user?.id;
-  if (!uid) throw new Error("Sesión no iniciada");
+  if (!uid) throw new Error("Inicia sesión con Supabase para subir una foto.");
 
   const ext = (asset.mimeType?.split("/")[1] || "jpg").replace("jpeg", "jpg");
   const path = `${uid}/avatar-${Date.now()}.${ext}`;
 
-  let body: Blob | File;
   if (Platform.OS === "web") {
-    body = await (await fetch(asset.uri)).blob();
+    const blob = await (await fetch(asset.uri)).blob();
+    const { error } = await supabase.storage.from("avatars").upload(path, blob, {
+      contentType: asset.mimeType ?? "image/jpeg",
+      upsert: true,
+    });
+    if (error) throw new Error(error.message);
   } else {
-    // React Native: FormData upload
     const form = new FormData();
-    form.append("file", { uri: asset.uri, name: path.split("/")[1], type: asset.mimeType ?? "image/jpeg" } as any);
+    form.append("file", {
+      uri: asset.uri,
+      name: path.split("/")[1],
+      type: asset.mimeType ?? "image/jpeg",
+    } as any);
     const { error } = await supabase.storage.from("avatars").upload(path, form as any, { upsert: true });
     if (error) throw new Error(error.message);
-    return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
   }
-
-  const { error } = await supabase.storage.from("avatars").upload(path, body, { contentType: asset.mimeType ?? "image/jpeg", upsert: true });
-  if (error) throw new Error(error.message);
   return supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
 }
