@@ -1,0 +1,102 @@
+# First independent Android build of BAYMOVE. No Expo/EAS login, no API keys,
+# no Play Store upload, and no public artifact from this PUBLIC repository.
+name: BAYMOVE Android native (no EAS)
+
+on:
+  push:
+    branches:
+      - recovery/my-cluster-core-20261013
+    paths:
+      - .github/workflows/baymove-android-native.yml
+      - frontend/app.config.js
+      - frontend/app.json
+      - frontend/package.json
+      - frontend/yarn.lock
+  workflow_dispatch:
+    inputs:
+      upload_apk_if_private:
+        description: "Upload a debug APK only if the GitHub repository is private"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: baymove-android-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-debug:
+    name: Native debug APK compile
+    if: github.ref == 'refs/heads/recovery/my-cluster-core-20261013'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      # Do not inject G3000 / TomTom secrets in an artifact from a public repo.
+      # Empty key is intentional for the first compilation smoke test.
+      G3000_MAPS_ANDROID_API_KEY: ""
+      G3000_MAPS_IOS_API_KEY: ""
+    steps:
+      - name: Checkout only recovery branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK command line tools
+        uses: android-actions/setup-android@v3
+
+      - name: Android platform and build tools
+        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install Yarn v1
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+
+      - name: Install dependencies from locked versions
+        run: yarn install --frozen-lockfile --non-interactive
+
+      - name: Validate dynamic Expo app config
+        run: npx expo config --json > /dev/null
+
+      - name: Generate Android native project without EAS
+        run: npx expo prebuild --clean --platform android --no-install
+
+      - name: Compile unsigned-for-release, debug-signed Android APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace --console=plain -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+
+      - name: Report verified APK existence (never log secret)
+        run: |
+          test -f android/app/build/outputs/apk/debug/app-debug.apk
+          ls -lh android/app/build/outputs/apk/debug/app-debug.apk
+          echo "APK compilation passed. No Google Maps API key included."
+
+      # GitHub Actions artifacts in PUBLIC repos are available to others who
+      # can read the repository. Never upload to public repository by default.
+      - name: Upload debug APK only to a private repository when explicitly requested
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.upload_apk_if_private && github.event.repository.private }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: baymove-android-debug-no-api-key
+          path: frontend/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 2
+          if-no-files-found: error
