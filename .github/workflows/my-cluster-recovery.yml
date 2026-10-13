@@ -1,0 +1,39 @@
+name: My Cluster recovery checks
+on:
+  push:
+    branches:
+      - recovery/my-cluster-core-20261013
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate Python syntax
+        run: python -m compileall -q backend
+
+  frontend-typecheck:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install compatible Yarn
+        run: corepack enable && corepack prepare yarn@1.22.22 --activate
+      - name: Restore frontend dependencies
+        run: yarn install --frozen-lockfile --ignore-scripts --non-interactive
+      - name: Check TypeScript
+        run: yarn tsc --noEmit
+      - name: Compile Expo web preview
+        run: npx expo export -p web
