@@ -61,11 +61,18 @@ async def group_view(g: dict, viewer_id: str) -> dict:
     gid = str(g["_id"])
     await _expire_temporaries(gid)
     members = [serialize(m) for m in await db.members.find({"group_id": gid, "status": {"$ne": "removed"}}).to_list(200)]
-    invitations = {str(i["_id"]): serialize(i) for i in await db.invitations.find({"group_id": gid}).to_list(200)}
+    viewer_role = next((m["role"] for m in members if m.get("user_id") == viewer_id and m.get("status") == "active"), None)
+    can_manage = viewer_role in ("owner", "admin")
+    # Invitation bearer tokens and phone numbers are administrative secrets.
+    # A regular circle member must never receive another person's invite link.
+    invitations = ({str(i["_id"]): serialize(i) for i in
+                    await db.invitations.find({"group_id": gid}).to_list(200)}) if can_manage else {}
     for m in members:
         inv = invitations.get(m.get("invitation_id") or "")
         if inv:
             m["invitation"] = {k: inv.get(k) for k in ("status", "channel", "phone", "created_at", "dispatched_at", "link", "token", "id")}
+        if not can_manage:
+            m.pop("invitation_id", None)
         if m.get("user_id"):
             eff = await effective_permissions(m["user_id"])
             m["shares_location"] = is_granted(eff, "exact_location", gid) or is_granted(eff, "approx_location", gid)
