@@ -16,3 +16,8 @@ Reglas absolutas: sin modo demo, sin datos inventados, estados veraces (`NO DISP
 - GRUPO: miembros orbitales, invitaciones (WhatsApp/SMS), roles, actividad, quedadas, convoyes
 - QUEDADA · CONVOY · PRIVACIDAD (PulseCard) · PLAN (Free/Basic/Pro; pago ⛔) · PERFIL · LEGAL
 - Eliminado del árbol: V16, Road Reality, Cámara, Trayecto protegido, Métricas/Patrones/Confianza/Calidad, Multimodal/Ahorro/Sostenible/Cotidianas, Casa/Lugares/Rutas habituales, Llamar
+
+## Actualización de producto G3000 / BAYMOVE — 2026-10-14
+La funcionalidad de prevención ambiental, condiciones del trayecto, preferencias de alerta por contaminación/polen, avisos oficiales y recordatorios para rutas habituales pasa a formar parte **de los requisitos futuros**. La exclusión histórica de `Casa/Lugares/Rutas habituales` se mantiene como estado heredado, **no** como prohibición de construirlo.
+**Especificación de referencia:** [G3000_ENVIRONMENT_AND_ROUTE_SAFETY.md](G3000_ENVIRONMENT_AND_ROUTE_SAFETY.md).
+**Estado:** solicitado y documentado, no implementado ni verificado en teléfonos.
