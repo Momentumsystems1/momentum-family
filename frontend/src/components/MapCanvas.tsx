@@ -75,7 +75,7 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
     <View style={{ flex: 1, backgroundColor: colors.mapTint }} testID="map-canvas">
       <MapView ref={ref} style={{ flex: 1 }} provider={provider} customMapStyle={scheme === "dark" ? DARK_STYLE : LIGHT_STYLE} userInterfaceStyle={scheme}
         initialCamera={{ center: { latitude: c.lat, longitude: c.lng }, pitch: perspective === "3d" ? 45 : 0, heading: 0, zoom: center ? 15 : 12, altitude: 900 }}
-        pitchEnabled={true} rotateEnabled={true} buildingsEnabled={true}
+        pitchEnabled={true} rotateEnabled={true}
         showsCompass={true} toolbarEnabled={false} showsMyLocationButton={false}
         onPress={(e) => { if ((e.nativeEvent as any).action === "marker-press") return; onMapPress?.(coord(e)); }}
         onLongPress={(e) => onMapLongPress?.(coord(e))}>
