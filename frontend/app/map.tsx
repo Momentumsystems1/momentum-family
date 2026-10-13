@@ -74,7 +74,7 @@ export default function MapHome() {
   const recenter = () => { if (!mePos) { toast(loc.perm === "granted" ? "Obteniendo tu ubicación…" : "Permite la ubicación para centrarte"); if (loc.perm !== "granted") setLocBanner(true); return; } setFocus({ ...mePos, key: (focus?.key ?? 0) + 1 }); };
   const checkIn = async () => {
     if (!group) return toast("Crea un grupo primero");
-    try { await api("/events", { method: "POST", json: { group_id: group.id, kind: "checkin", severity: "info", message: "¿Todo bien?" } }); toast("Pregunta enviada a tu grupo", "success"); } catch (e: any) { toast(e.message, "error"); }
+    try { await api("/events", { method: "POST", json: { group_id: group.id, kind: "checkin", severity: "info", message: "¿Todo bien?" } }); toast("Pregunta registrada. Avisos automáticos aún no disponibles.", "success"); } catch (e: any) { toast(e.message, "error"); }
   };
   const originParams = mePos ? { fromLat: String(mePos.lat), fromLng: String(mePos.lng) } : {};
   const selName = reverse.data?.name ?? (sel ? `${sel.lat.toFixed(5)}, ${sel.lng.toFixed(5)}` : "");
