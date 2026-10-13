@@ -64,7 +64,7 @@ jobs:
           REFRESH_DAYS: '30'
           APP_PUBLIC_URL: https://baymove-preview.invalid
           TERMS_VERSION: '2026-06-01'
-        run: python tests/vertical_slice_ci.py
+        run: python -m tests.vertical_slice_ci
 
   frontend-typecheck:
     runs-on: ubuntu-latest
