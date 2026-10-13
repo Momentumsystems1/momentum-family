@@ -31,7 +31,7 @@ export default function Index() {
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, gap: 12 }} testID="bootstrap-screen">
       <ActivityIndicator color={colors.brandPrimary} />
-      <T style={{ color: colors.muted }}>Sentinel</T>
+      <T style={{ color: colors.muted }}>BAYMOVE</T>
     </View>
   );
 }
