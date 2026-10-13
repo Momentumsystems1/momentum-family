@@ -37,7 +37,7 @@ async def run() -> None:
             timeout=12,
         ) as client:
             prefix = uuid.uuid4().hex[:12]
-            emails = [f"baymove-{label}-{prefix}@example.invalid" for label in ("owner", "guest", "stranger")]
+            emails = [f"baymove-{label}-{prefix}@baymove-ci.dev" for label in ("owner", "guest", "stranger")]
             members = []
             for email in emails:
                 result = await checked(
