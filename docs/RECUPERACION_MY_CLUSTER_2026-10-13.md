@@ -59,3 +59,6 @@ Detección de accidentes por sensores, monitorización de fondo permanente, inte
 - Frontend: instalación Yarn con `--ignore-scripts`, TypeScript estricto y exportación Expo web: OK.
 - **No probados:** backend con MongoDB activo, endpoints end-to-end, navegación de usuarios, mapa nativo, seguimiento móvil, consumo de batería ni publicación en stores.
 La validación estática no demuestra que los sistemas estén listos para producción ni autoriza afirmaciones de seguridad de accidentes. No declarar hitos completos solo por los informes históricos de Emergent.
+
+## Ampliación de alcance (2026-10-14)
+La aplicación se identifica provisionalmente como **BAYMOVE** y el proyecto Google Cloud es **G3000**. Se añade para desarrollo posterior el módulo de alertas por calidad del aire, polen, meteorología, viento, hielo posible, niebla, tramos oficiales de riesgo y rutas habituales. La referencia detallada es [G3000_ENVIRONMENT_AND_ROUTE_SAFETY.md](G3000_ENVIRONMENT_AND_ROUTE_SAFETY.md). **No está implementado todavía.**
