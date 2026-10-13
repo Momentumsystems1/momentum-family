@@ -149,3 +149,7 @@ References:
 - https://developers.google.com/maps/documentation/maps-3d/android-sdk/overview
 - https://developers.google.com/maps/documentation/maps-3d/ios-sdk/overview
 - https://developers.google.com/maps/documentation/elevation/overview
+
+
+## 11. Estado de implementación móvil (2026-10-14)
+Configurado `frontend/app.config.js` para el plugin `react-native-maps`, cámara inclinada 2,5D y botón nativo 2D/3D en `frontend/src/components/MapCanvas.tsx` / `frontend/app/map.tsx`. Para firma Android, restricciones SHA-1 y variables EAS véase [G3000_ANDROID_PREVIEW.md](G3000_ANDROID_PREVIEW.md). Aún no hay APK ni pruebas en dispositivos; no equiparar cámara inclinada con SDK 3D fotorrealista.
