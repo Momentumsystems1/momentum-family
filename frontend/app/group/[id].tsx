@@ -100,7 +100,7 @@ export default function GroupDetail() {
                 <Ionicons name={e.kind === "emergency" ? "alert-circle" : e.kind === "incident" ? "warning" : "help-circle"} size={20} color={e.severity === "critical" ? colors.error : e.severity === "warning" ? colors.orangeRisk : colors.brandPrimary} />
                 <View style={{ flex: 1 }}>
                   <T weight="semibold">{e.message ?? e.kind}</T>
-                  <T style={{ fontSize: 12, color: colors.muted }}>{new Date(e.created_at).toLocaleString("es-ES")} · escalado: {e.escalation} · {e.recipients?.length ?? 0} destinatarios</T>
+                  <T style={{ fontSize: 12, color: colors.muted }}>{new Date(e.created_at).toLocaleString("es-ES")} · {e.delivery_status === "not_configured" ? "Registrado · sin notificación automática" : e.delivery_status === "delivered" ? "Notificación entregada" : "Entrega no confirmada"} · {e.recipients?.length ?? 0} participantes</T>
                 </View>
                 <Pill label={e.state} tone={e.state === "resolved" ? "green" : e.state === "escalated" ? "red" : "amber"} />
                 {e.state === "open" ? <Pressable testID={`event-ok-${e.id}`} onPress={() => eventAction.mutate({ eid: e.id, action: "respond_ok" })} style={s.iconBtn}><Ionicons name="checkmark" size={18} color={colors.success} /></Pressable> : null}
