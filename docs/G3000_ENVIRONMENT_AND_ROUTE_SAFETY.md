@@ -156,3 +156,6 @@ Configurado `frontend/app.config.js` para el plugin `react-native-maps`, cámara
 
 ## 12. Precio combustible y recarga EV en rutas (2026-10-14)
 Nueva necesidad aprobada para BAYMOVE: gasolineras y tarifas por tipo de combustible; cargadores eléctricos con disponibilidad, conectores, potencia y precio €/kWh cuando se disponga de datos autorizados y actualizados; comparación de costes y desvíos sobre rutas. No depende de disponer de licencia comercial de TomTom Fuel Prices. Se investigarán datos oficiales de España y proveedores autorizados. **Especificación detallada:** [G3000_TOMTOM_EV_FUEL_PLAN.md](G3000_TOMTOM_EV_FUEL_PLAN.md). Estado: pendiente de integración, NO FUNCIONAL.
+
+## 13. NAP transporte público e incidencias de servicio (2026-10-14)
+Añadidas al alcance de BAYMOVE alertas de transporte multimodal con fuentes oficiales NAP de Transportes (GTFS/GTFS-RT/SIRI/NeTEx), NAP DGT de incidencias viales (DATEX II v3.7), SCT, TMB, EMT Madrid, FGC y Renfe. No confundir horarios con tiempo real. Arquitectura y condiciones de acceso en [G3000_NAP_TRANSIT_ROAD_LIVE_FEEDS.md](G3000_NAP_TRANSIT_ROAD_LIVE_FEEDS.md). **Pendiente de implementación y de validar endpoints concretos.**
