@@ -1,9 +1,10 @@
 import { Platform } from "react-native";
 
-import { supabase } from "@/src/supabase";
+import { getSupabase } from "@/src/supabase";
 import { storage } from "@/src/utils/storage";
 
-export const BASE = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api`;
+const backendUrl = (process.env.EXPO_PUBLIC_BACKEND_URL ?? "").replace(/\/+$/, "");
+export const BASE = backendUrl ? `${backendUrl}/api` : "";
 const TOKENS_KEY = "sentinel.tokens";
 
 export type Tokens = { access_token: string; refresh_token: string };
@@ -62,19 +63,45 @@ async function parse(r: Response) {
 }
 
 async function refresh(): Promise<boolean> {
-  // Supabase owns the session lifecycle; ask it for a fresh access token.
   const t = await loadTokens();
-  if (!t) return false;
-  const { data, error } = await supabase.auth.refreshSession({ refresh_token: t.refresh_token });
-  if (error || !data.session) {
-    await saveTokens(null);
+  if (!t || !BASE) return false;
+  try {
+    if (process.env.EXPO_PUBLIC_AUTH_BACKEND === "supabase") {
+      const sb = getSupabase();
+      if (!sb) return false;
+      const { data, error } = await sb.auth.refreshSession({ refresh_token: t.refresh_token });
+      if (error || !data.session) {
+        await saveTokens(null);
+        return false;
+      }
+      await saveTokens({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      });
+      return true;
+    }
+    const r = await fetch(`${BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: t.refresh_token }),
+    });
+    if (!r.ok) {
+      await saveTokens(null);
+      return false;
+    }
+    const next = await r.json();
+    await saveTokens({
+      access_token: next.access_token,
+      refresh_token: next.refresh_token,
+    });
+    return true;
+  } catch {
     return false;
   }
-  await saveTokens({ access_token: data.session.access_token, refresh_token: data.session.refresh_token });
-  return true;
 }
 
 export async function api<T = any>(path: string, init: RequestInit & { json?: any; auth?: boolean } = {}): Promise<T> {
+  if (!BASE) throw new ApiError(0, "Configura EXPO_PUBLIC_BACKEND_URL para conectar con el servidor.");
   const { json, auth = true, ...rest } = init;
   const headers: Record<string, string> = { ...(rest.headers as any), "Content-Type": "application/json" };
   // TEMP (preproducción): con el backend tras localtunnel, esta cabecera evita su página
