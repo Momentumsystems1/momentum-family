@@ -11,7 +11,7 @@ import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -38,6 +38,7 @@ export default function MapHome() {
   const [locBanner, setLocBanner] = useState(false);
   const [sel, setSel] = useState<LatLng | null>(null);
   const [myPos, setMyPos] = useState<LatLng | null>(null);
+  const [mapPerspective, setMapPerspective] = useState<"2d" | "3d">("3d");
   const [focus, setFocus] = useState<(LatLng & { key: number }) | undefined>();
 
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api<any[]>("/groups"), refetchInterval: 15000 });
@@ -81,7 +82,7 @@ export default function MapHome() {
 
   return (
     <View style={s.root} testID="map-home">
-      <MapCanvas people={people} center={focus} selected={sel} onMapPress={onMapPress} onMapLongPress={(c) => { setMenu(false); setSel(c); }}
+      <MapCanvas people={people} center={focus} perspective={mapPerspective} selected={sel} onMapPress={onMapPress} onMapLongPress={(c) => { setMenu(false); setSel(c); }}
         onPersonPress={(p) => { closeAll(); if (p.member_id === "me-local") router.push("/profile"); else router.push(`/person/${p.member_id}?group=${group?.id}`); }} />
 
       {/* Compact navigator pill */}
@@ -133,6 +134,7 @@ export default function MapHome() {
             <MenuItem testID="qa-privacy" icon="lock-closed" label="Privacidad" onPress={() => { setMenu(false); router.push("/privacy"); }} />
           </Animated.View>
         ) : null}
+        {Platform.OS !== "web" ? <Pressable testID="fab-map-perspective" onPress={() => setMapPerspective((current) => current === "3d" ? "2d" : "3d")} style={s.fab} accessibilityLabel={`Cambiar a vista ${mapPerspective === "3d" ? "2D" : "3D"}`}><T weight="bold" style={{ color: colors.onSurface, fontSize: 14 }}>{mapPerspective === "3d" ? "3D" : "2D"}</T></Pressable> : null}
         <Pressable testID="fab-recenter" onPress={recenter} style={s.fab} accessibilityLabel="Centrar en mi ubicación"><Ionicons name="locate" size={20} color={mePos ? colors.brandPrimary : colors.muted} /></Pressable>
         <Pressable testID="fab-tools" onPress={() => { setSel(null); setMenu(!menu); }} style={[s.fab, menu && s.fabOn]} accessibilityLabel="Herramientas"><Ionicons name={menu ? "close" : "grid"} size={20} color={menu ? colors.onBrandPrimary : colors.onSurface} /></Pressable>
       </View>
