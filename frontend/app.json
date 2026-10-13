@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BAYMOVE",
-    "slug": "baymove",
+    "slug": "sentinel-family",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -61,6 +61,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "owner": "dctinvent.com",
+    "extra": {
+      "eas": {
+        "projectId": "23176eaf-b779-4840-8f1e-f7f7e6d5d9fe"
+      }
     }
   }
 }
