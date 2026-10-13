@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
-import { api, saveTokens } from "@/src/api";
-import { supabase } from "@/src/supabase";
+import { api, clientMeta, loadTokens, saveTokens } from "@/src/api";
+import { getSupabase } from "@/src/supabase";
 import { storage } from "@/src/utils/storage";
 
 export type User = {
@@ -25,8 +25,10 @@ type Ctx = {
   setUser: (u: User) => void;
 };
 
+type LoginResult = { access_token: string; refresh_token: string; user: User };
 const AuthContext = createContext<Ctx | null>(null);
 export const ONBOARDING_KEY = "sentinel.onboarding";
+const USE_SUPABASE = process.env.EXPO_PUBLIC_AUTH_BACKEND === "supabase";
 
 export type LocalOnboarding = { step: string; terms_accepted_at?: string };
 
@@ -58,16 +60,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (): Promise<User | null> => {
     try {
-      const { data } = await supabase.auth.getSession();
-      const session = data.session;
-      if (!session) {
-        await saveTokens(null);
+      if (USE_SUPABASE) {
+        const sb = getSupabase();
+        if (!sb) throw new Error("Supabase no configurado");
+        const { data } = await sb.auth.getSession();
+        if (!data.session) {
+          await saveTokens(null);
+          setUser(null);
+          return null;
+        }
+        await saveTokens({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+      } else if (!(await loadTokens())) {
         setUser(null);
         return null;
       }
-      await saveTokens({ access_token: session.access_token, refresh_token: session.refresh_token });
       const me = await api<User>("/auth/me");
       setUser(me);
       return me;
@@ -78,39 +89,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    reload().finally(() => setLoading(false));
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      // Keep the API client's bearer token in sync with Supabase's own refresh cycle.
-      if (session) void saveTokens({ access_token: session.access_token, refresh_token: session.refresh_token });
-      else if (event === "SIGNED_OUT") void saveTokens(null);
+    void reload().finally(() => setLoading(false));
+    if (!USE_SUPABASE) return;
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = sb.auth.onAuthStateChange((event, session) => {
+      if (session) {
+        void saveTokens({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+      } else if (event === "SIGNED_OUT") {
+        void saveTokens(null);
+      }
     });
-    return () => sub.subscription.unsubscribe();
+    return () => data.subscription.unsubscribe();
   }, [reload]);
 
-  const afterSession = async (): Promise<User> => {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    if (!session) throw new Error("No se pudo crear la sesión");
-    await saveTokens({ access_token: session.access_token, refresh_token: session.refresh_token });
+  const afterSupabaseSession = async (): Promise<User> => {
+    const sb = getSupabase();
+    if (!sb) throw new Error("Supabase no configurado");
+    const { data } = await sb.auth.getSession();
+    if (!data.session) throw new Error("No se pudo crear la sesión");
+    await saveTokens({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+    });
     const me = await api<User>("/auth/me");
     setUser(me);
     return me;
   };
 
+  const localAuth = async (path: "/auth/login" | "/auth/register", email: string, password: string) => {
+    const response = await api<LoginResult>(path, {
+      method: "POST",
+      auth: false,
+      json: { email, password, ...clientMeta },
+    });
+    await saveTokens({
+      access_token: response.access_token,
+      refresh_token: response.refresh_token,
+    });
+    setUser(response.user);
+    return response.user;
+  };
+
   const value = useMemo<Ctx>(() => ({
     user, loading, reload, setUser,
     signIn: async (email, password) => {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!USE_SUPABASE) return localAuth("/auth/login", email, password);
+      const sb = getSupabase();
+      if (!sb) throw new Error("Faltan las credenciales de Supabase");
+      const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(friendlyAuthError(error.message));
-      return afterSession();
+      return afterSupabaseSession();
     },
     register: async (email, password) => {
-      const { error } = await supabase.auth.signUp({ email, password });
+      if (!USE_SUPABASE) return localAuth("/auth/register", email, password);
+      const sb = getSupabase();
+      if (!sb) throw new Error("Faltan las credenciales de Supabase");
+      const { data, error } = await sb.auth.signUp({ email, password });
       if (error) throw new Error(friendlyAuthError(error.message));
-      return afterSession();
+      if (!data.session) throw new Error("Confirma tu email antes de entrar");
+      return afterSupabaseSession();
     },
     signOut: async () => {
-      await supabase.auth.signOut().catch(() => null);
+      const tokens = await loadTokens();
+      if (USE_SUPABASE) {
+        await getSupabase()?.auth.signOut().catch(() => null);
+      } else if (tokens?.refresh_token) {
+        await api("/auth/logout", {
+          method: "POST",
+          json: { refresh_token: tokens.refresh_token },
+        }).catch(() => null);
+      }
       await saveTokens(null);
       await storage.removeItem(ONBOARDING_KEY);
       setUser(null);
