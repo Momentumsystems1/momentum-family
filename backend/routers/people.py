@@ -131,7 +131,8 @@ async def create_event(body: EventBody, user=Depends(current_user)):
     recipients = [m["user_id"] for m in await db.members.find(
         {"group_id": body.group_id, "status": "active", "user_id": {"$nin": [None, uid]}}).to_list(200)]
     ev = {**body.model_dump(), "source": "user", "user_id": uid, "created_at": now(), "confidence": 1.0,
-          "state": "open", "recipients": recipients, "escalation": "private_warning" if body.kind != "emergency" else "emergency",
+          "state": "open", "recipients": recipients, "delivery_status": "not_configured",
+          "escalation": "private_warning" if body.kind != "emergency" else "emergency",
           "trace": [{"at": now(), "action": "created", "by": uid}]}
     res = await db.events.insert_one(ev)
     ev["_id"] = res.inserted_id
