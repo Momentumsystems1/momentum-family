@@ -40,9 +40,9 @@ Los cambios **no equivalen a una compilación ni una prueba en dispositivos real
 7. No utilizar claves de producción, datos personales reales ni publicar la app antes de pasar controles.
 
 ## Criterios objetivos del núcleo recuperado (pendientes de verificar)
-- [ ] `yarn install --frozen-lockfile` termina sin errores.
-- [ ] `npx tsc --noEmit` sin errores TypeScript.
-- [ ] `npx expo export -p web` genera la vista web sin fallos (no demuestra mapa nativo).
+- [x] `yarn install --frozen-lockfile --ignore-scripts` termina sin errores en GitHub Actions; instalación con scripts nativos sin verificar.
+- [x] `yarn tsc --noEmit` sin errores TypeScript en GitHub Actions.
+- [x] `npx expo export -p web` genera la vista web sin fallos en GitHub Actions (no demuestra mapa nativo).
 - [ ] Backend arranca con MongoDB de prueba y `GET /api/` responde.
 - [ ] Usuario A se registra, hace onboarding y crea un grupo; usuario B se registra y acepta invitación.
 - [ ] Ambos ven sus ubicaciones reales en dos teléfonos distintos al conceder permisos.
@@ -54,4 +54,8 @@ Los cambios **no equivalen a una compilación ni una prueba en dispositivos real
 Detección de accidentes por sensores, monitorización de fondo permanente, integración V16, pagos, inteligencia de hábitos y convoy avanzado. Se abordarán con dispositivos reales después de validar el núcleo.
 
 ## Estado de validación
-Revisión estática del código vía GitHub y recuperación de rama realizadas. No se ha ejecutado el proyecto en móvil ni instalado dependencias localmente desde este entorno. No declarar hitos completos solo por los informes históricos de Emergent.
+**13 octubre 2026 — comprobación automatizada superada:** [GitHub Actions — run 38427499470](https://github.com/Momentumsystems1/momentum-family/actions/runs/38427499470).
+- Backend: sintaxis Python, instalación de `requirements-core.txt` e importación de FastAPI con configuración de prueba: OK.
+- Frontend: instalación Yarn con `--ignore-scripts`, TypeScript estricto y exportación Expo web: OK.
+- **No probados:** backend con MongoDB activo, endpoints end-to-end, navegación de usuarios, mapa nativo, seguimiento móvil, consumo de batería ni publicación en stores.
+La validación estática no demuestra que los sistemas estén listos para producción ni autoriza afirmaciones de seguridad de accidentes. No declarar hitos completos solo por los informes históricos de Emergent.
