@@ -153,3 +153,6 @@ References:
 
 ## 11. Estado de implementación móvil (2026-10-14)
 Configurado `frontend/app.config.js` para el plugin `react-native-maps`, cámara inclinada 2,5D y botón nativo 2D/3D en `frontend/src/components/MapCanvas.tsx` / `frontend/app/map.tsx`. Para firma Android, restricciones SHA-1 y variables EAS véase [G3000_ANDROID_PREVIEW.md](G3000_ANDROID_PREVIEW.md). Aún no hay APK ni pruebas en dispositivos; no equiparar cámara inclinada con SDK 3D fotorrealista.
+
+## 12. Precio combustible y recarga EV en rutas (2026-10-14)
+Nueva necesidad aprobada para BAYMOVE: gasolineras y tarifas por tipo de combustible; cargadores eléctricos con disponibilidad, conectores, potencia y precio €/kWh cuando se disponga de datos autorizados y actualizados; comparación de costes y desvíos sobre rutas. No depende de disponer de licencia comercial de TomTom Fuel Prices. Se investigarán datos oficiales de España y proveedores autorizados. **Especificación detallada:** [G3000_TOMTOM_EV_FUEL_PLAN.md](G3000_TOMTOM_EV_FUEL_PLAN.md). Estado: pendiente de integración, NO FUNCIONAL.
