@@ -32,6 +32,40 @@ jobs:
           TERMS_VERSION: '2026-06-01'
         run: python -c "from server import app; assert app.title == 'Sentinel Family API'; print('Backend imports successfully')"
 
+
+  baymove-real-circle:
+    name: BAYMOVE real-circle integration (temporary MongoDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.adminCommand({ping:1})'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install backend requirements (no private services)
+        run: python -m pip install -r backend/requirements-core.txt
+      - name: Exercise real registration, circle, invitations, privacy and check-in
+        working-directory: backend
+        env:
+          MONGO_URL: mongodb://127.0.0.1:27017
+          DB_NAME: baymove_disposable_ci
+          JWT_SECRET: test-only-ci-not-for-production-baymove-2026
+          ACCESS_MINUTES: '20'
+          REFRESH_DAYS: '30'
+          APP_PUBLIC_URL: https://baymove-preview.invalid
+          TERMS_VERSION: '2026-06-01'
+        run: python tests/vertical_slice_ci.py
+
   frontend-typecheck:
     runs-on: ubuntu-latest
     defaults:
