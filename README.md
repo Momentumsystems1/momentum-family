@@ -20,3 +20,6 @@ Este repositorio contiene una base histórica Expo/React Native + FastAPI para l
 
 [Preparación del mapa nativo y APK Android](docs/G3000_ANDROID_PREVIEW.md).
 Las claves de Google Maps pertenecen a la configuración nativa de compilación EAS, no al JavaScript ni al Secret Manager del backend. No se ha generado una APK real ni ejecutado una prueba móvil todavía.
+
+## Transporte público e incidencias en tiempo real
+[Inventario NAP nacional, DGT, TMB, EMT, FGC y Renfe y plan de integración](docs/G3000_NAP_TRANSIT_ROAD_LIVE_FEEDS.md). Requisitos documentados; adaptadores aún no implementados.
