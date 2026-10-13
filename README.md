@@ -15,3 +15,8 @@ Este repositorio contiene una base histórica Expo/React Native + FastAPI para l
 4. `cd frontend && corepack enable && yarn install --frozen-lockfile && npx expo start`.
 
 **No es todavía una aplicación validada.** El mapa móvil debe comprobarse en teléfonos reales; el mapa web es solo una vista espacial. La detección de accidentes, el GPS continuo en segundo plano y la conexión V16 siguen fuera del alcance de esta recuperación. Rutas y tráfico aún referencian Azure heredado, pendiente de migración a Google Maps.
+
+## BAYMOVE / G3000: Maps y APK de prueba
+
+[Preparación del mapa nativo y APK Android](docs/G3000_ANDROID_PREVIEW.md).
+Las claves de Google Maps pertenecen a la configuración nativa de compilación EAS, no al JavaScript ni al Secret Manager del backend. No se ha generado una APK real ni ejecutado una prueba móvil todavía.
