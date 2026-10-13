@@ -128,3 +128,24 @@ P5: sensor-based accident detection / continuous background monitoring after cor
 - https://opendata.aemet.es/dist/
 - https://opendata.aemet.es/centrodedescargas/novedades
 - https://nap.dgt.es/es/dataset
+
+## 10. BAYMOVE native map UX: navigation perspective and optional immersive 3D (2026-10-14)
+**Accepted product direction, NOT implemented or tested.** BAYMOVE's main map must use a clean, legible, Waze-like navigational perspective (not copied artwork or brand): fluid follow mode, directional camera, gentle pitch, prominent roads and route polyline, traffic/status overlays, personalized family pins and minimal obstruction of the map.
+
+**Phase A (core, required):** use the standard Maps SDK for Android / Maps SDK for iOS through the already present `react-native-maps` MapView. Switch Google provider explicitly on iOS when native integration is wired; use `initialCamera`, `animateCamera`, `heading`, `pitch`, zoom and map styling. Prefer a tilted 2.5D perspective with available buildings to a heavy photo-realistic renderer. Provide a 2D overhead toggle and automatic fallback when the mobile GPU, coverage or battery conditions make 3D impractical. No assumptions that current web spatial placeholder is a real map.
+
+**Phase B (experimental, optional):** evaluate Google **Maps 3D SDK for Android** and **Maps 3D SDK for iOS** for a separate landmark/route-exploration mode. Both were still marked experimental (pre-GA) in Google documentation as of October 2026; they require native SDK integration and cannot be treated as a drop-in property of the current React Native MapView. Performance, battery, coverage, billing and license need separate review. Do not block the core on this mode.
+
+**Elevation API:** useful for altimetry, grade on cycling/walking routes, steep segments and risk context. It returns elevations relative to mean sea level. Elevation data **is not** the 3D renderer and does **not** confirm ice on roads. If added, allowlist **Elevation API** on the `G3000_MAPS_SERVER_API_KEY` backend-only key. Use official weather/road incident feeds for icing and incident claims.
+
+**Credential impact:** no new credential is inherently needed for a standard tilted map; `G3000_MAPS_IOS_API_KEY` stays restricted to the BAYMOVE iOS bundle ID and standard Maps SDK for iOS. Optionally add Maps 3D SDK for iOS to the same iOS application-restricted key only when explicitly enabled and integrated; similarly Android with its package + real SHA-1. No iOS or Android client key may gain Elevation or other server APIs. Server API key may allowlist Elevation alongside Weather, Air Quality, Pollen, Routes, Places (New) and Geocoding, but must be protected with appropriate server restrictions and cannot be embedded in the app.
+
+**Acceptance:** screen on a physical Android and iPhone actually shows a Google basemap, pitch/heading tracking works, zoom/rotation and user gesture recovery are smooth, route markers and alerts are readable, family members visible, 2D toggle works, current location shown only with consent, and no placeholder can be mistaken for live data.
+
+References:
+- https://developers.google.com/maps/documentation/ios-sdk/views
+- https://developers.google.com/maps/documentation/android-sdk/controls
+- https://github.com/react-native-maps/react-native-maps/blob/master/docs/mapview.md
+- https://developers.google.com/maps/documentation/maps-3d/android-sdk/overview
+- https://developers.google.com/maps/documentation/maps-3d/ios-sdk/overview
+- https://developers.google.com/maps/documentation/elevation/overview
