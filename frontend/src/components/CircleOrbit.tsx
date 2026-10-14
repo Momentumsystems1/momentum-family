@@ -101,7 +101,7 @@ export function CircleOrbit({ name, members, ownerId, size, onMemberPress }: Pro
       {orbitMembers.length === 0 ? (
         <View pointerEvents="none" style={{
           position: "absolute", bottom: 16, alignSelf: "center",
-          borderRadius: 20, backgroundColor,
+          borderRadius: 20, backgroundColor: background,
           paddingHorizontal: 15, paddingVertical: 5,
         }}>
           <Text style={{ fontFamily: fonts.medium, fontSize: 12, color: "#786A74" }}>Añade personas cuando quieras</Text>
