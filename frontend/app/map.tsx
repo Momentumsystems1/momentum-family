@@ -71,8 +71,8 @@ export default function MapHome() {
     queryKey: ["permissions"], queryFn: () => api("/permissions"),
   });
   const sharesLocation = !!permissions.data &&
-    Object.entries(permissions.data).some(([key, value]) =>
-      (key === "exact_location" || key === "approx_location") && value?.effective === true
+    Object.values(permissions.data).some((value) =>
+      (value?.key === "exact_location" || value?.key === "approx_location") && value.effective === true
     );
   const gps = useLocationSharing(sharesLocation);
   const positions = useQuery<MapPerson[]>({
