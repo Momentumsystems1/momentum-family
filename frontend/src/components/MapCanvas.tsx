@@ -70,6 +70,16 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
     }).catch(() => null);
     return () => { alive = false; };
   }, [perspective]);
+  // Show the complete route on the same map after routing resolves,
+  // instead of opening another map page or centering only on the destination.
+  useEffect(() => {
+    if (!polyline || polyline.length < 2) return;
+    ref.current?.fitToCoordinates(
+      polyline.map(([lat, lng]) => ({ latitude: lat, longitude: lng })),
+      { edgePadding: { top: 165, right: 65, bottom: 235, left: 55 }, animated: true },
+    );
+  }, [polyline]);
+
   const coord = (e: any) => ({ lat: e.nativeEvent.coordinate.latitude, lng: e.nativeEvent.coordinate.longitude });
   return (
     <View style={{ flex: 1, backgroundColor: colors.mapTint }} testID="map-canvas">
