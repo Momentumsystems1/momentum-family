@@ -7,8 +7,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, unavailableOf } from "@/src/api";
@@ -62,6 +62,31 @@ export default function MapHome() {
   const [candidates, setCandidates] = useState<Place[]>([]);
   const [searchError, setSearchError] = useState("");
   const [activityBusy, setActivityBusy] = useState(false);
+  // Hide the chrome only while moving the native map; the map remains active.
+  const chromeMotion = useRef(new Animated.Value(0)).current;
+  const motionActive = useRef(false);
+  const returnTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const startMapMotion = useCallback(() => {
+    if (returnTimer.current) clearTimeout(returnTimer.current);
+    if (motionActive.current) return;
+    motionActive.current = true;
+    setChromeHidden(true);
+    Animated.timing(chromeMotion, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [chromeMotion]);
+  const endMapMotion = useCallback(() => {
+    if (returnTimer.current) clearTimeout(returnTimer.current);
+    returnTimer.current = setTimeout(() => {
+      motionActive.current = false;
+      setChromeHidden(false);
+      Animated.timing(chromeMotion, { toValue: 0, duration: 370, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    }, 650);
+  }, [chromeMotion]);
+  useEffect(() => () => { if (returnTimer.current) clearTimeout(returnTimer.current); }, []);
+  const chromeOpacity = chromeMotion.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+  const hideTop = chromeMotion.interpolate({ inputRange: [0, 1], outputRange: [0, -460] });
+  const hideBottom = chromeMotion.interpolate({ inputRange: [0, 1], outputRange: [0, 420] });
+  const hideRight = chromeMotion.interpolate({ inputRange: [0, 1], outputRange: [0, 86] });
 
   const groups = useQuery<Group[]>({
     queryKey: ["groups"], queryFn: () => api<Group[]>("/groups"), refetchInterval: 15000,
@@ -176,6 +201,8 @@ export default function MapHome() {
     <View style={{ flex: 1 }} testID="unified-map-home">
       <MapCanvas
         people={people}
+        onInteractionStart={startMapMotion}
+        onInteractionEnd={endMapMotion}
         center={focus}
         perspective={perspective}
         polyline={mode === "navigate" ? route.data?.geometry : undefined}
@@ -195,7 +222,7 @@ export default function MapHome() {
         }}
       />
 
-      <View style={{ position: "absolute", top: insets.top + 8, left: 12, right: 12, gap: 9 }} pointerEvents="box-none">
+      <Animated.View style={{ position: "absolute", top: insets.top + 8, left: 12, right: 12, gap: 9, opacity: chromeOpacity, transform: [{ translateY: hideTop }] }} pointerEvents={chromeHidden ? "none" : "box-none"}>
         <View style={S.searchBar}>
           <Pressable testID="unified-search-open" onPress={() => { setMode("navigate"); setSearchOpen(true); }} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 }}>
             <Ionicons name="search" size={20} color={RED} />
@@ -255,9 +282,9 @@ export default function MapHome() {
             </View>
           </View>
         ) : null}
-      </View>
+      </Animated.View>
 
-      <View style={{ position: "absolute", right: 12, bottom: insets.bottom + 176, gap: 9, alignItems: "center" }} pointerEvents="box-none">
+      <Animated.View style={{ position: "absolute", right: 12, bottom: insets.bottom + 176, gap: 9, alignItems: "center", opacity: chromeOpacity, transform: [{ translateX: hideRight }] }} pointerEvents={chromeHidden ? "none" : "box-none"}>
         {Platform.OS !== "web" ? (
           <Fab id="unified-perspective" label={perspective === "3d" ? "Pasar a 2D" : "Pasar a 3D"} onPress={() => setPerspective(v => v === "2d" ? "3d" : "2d")}>
             <T weight="bold" style={{ color: INK }}>{perspective === "2d" ? "2D" : "3D"}</T>
@@ -266,9 +293,9 @@ export default function MapHome() {
         <Fab id="unified-recenter" label="Centrar en mi ubicación" onPress={recenter}>
           <Ionicons name="locate" size={22} color={me ? RED : MUTED}/>
         </Fab>
-      </View>
+      </Animated.View>
 
-      <View style={{ position: "absolute", left: 10, right: 10, bottom: insets.bottom + 10 }} testID={`unified-panel-${mode}`}>
+      <Animated.View style={{ position: "absolute", left: 10, right: 10, bottom: insets.bottom + 10, opacity: chromeOpacity, transform: [{ translateY: hideBottom }] }} pointerEvents={chromeHidden ? "none" : "auto"} testID={`unified-panel-${mode}`}>
         {mode === "explore" ? (
           <View style={S.bottomPanel}>
             <T weight="bold" style={S.panelTitle}>Explorar</T>
@@ -346,7 +373,7 @@ export default function MapHome() {
             </View>
           </View>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
