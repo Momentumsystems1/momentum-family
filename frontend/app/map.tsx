@@ -1,202 +1,419 @@
-// ============================================================
-// MAP — HOME (Life360 / Google Maps style). Visual priority: the map + the compact navigator bar.
-// - Compact top pill: greeting → "¿A dónde vamos?" after a few seconds; group + profile shortcuts inside the pill.
-// - User centered with navigator-like zoom; recenter FAB; compact tools FAB (menu disappears when the map is tapped).
-// - Tap / long-press on the map selects a point → reverse geocoding + tools (go, meet, convoy).
-// - No panel ever covers the map; location upload only with effective consent.
-// ============================================================
+// BAYMOVE G3000 — one native map, three contextual states.
+// EXPLORE: map/location. NAVIGATE: explicit search/tap + real route preview.
+// CIRCLE: authorized family membership + privacy states, no fake positions.
+// Turn-by-turn, live traffic, push and hosted backend are separate milestones.
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut } from "react-native-reanimated";
+import { ActivityIndicator, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { api } from "@/src/api";
+import { api, unavailableOf } from "@/src/api";
 import { useAuth } from "@/src/auth";
 import { LatLng, MapCanvas, MapPerson } from "@/src/components/MapCanvas";
-import { Button, Glass, T, toast } from "@/src/components/ui";
+import { T, showUnavailable, toast } from "@/src/components/ui";
 import { useLocationSharing } from "@/src/hooks/useLocationSharing";
-import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
 import { storage } from "@/src/utils/storage";
 
-const distM = (a: LatLng, b: LatLng) => { const R = 6371000, dLat = ((b.lat - a.lat) * Math.PI) / 180, dLng = ((b.lng - a.lng) * Math.PI) / 180; const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
-const fmtDist = (m: number) => (m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`);
+type Mode = "explore" | "navigate" | "circle";
+type GroupMember = {
+  id: string; display_name: string; status: string; user_id?: string | null;
+  location_state?: "shared" | "not_shared" | "permission_pending" | "pending_invitation";
+};
+type Group = {
+  id: string; name: string; members: GroupMember[];
+  stats: { members: number; pending: number; alerts: number; meeting: boolean; convoy: boolean };
+};
+type Place = { name: string; lat: number; lng: number };
+type RoutePreview = {
+  distance_m: number; duration_s: number; duration_traffic_s?: number | null;
+  geometry: [number, number][]; provider: string;
+};
+
+const RED = "#C91E32";
+const INK = "#2D292B";
+const MUTED = "#746E73";
+const PALE = "rgba(201,30,50,0.05)";
+const BORDER = "#E8E4E6";
+const fmtDuration = (seconds: number) => !Number.isFinite(seconds) ? "—" :
+  seconds < 3600 ? `${Math.max(1, Math.round(seconds / 60))} min` :
+  `${Math.floor(seconds / 3600)} h ${Math.round((seconds % 3600) / 60)} min`;
+const fmtDistance = (m: number) => !Number.isFinite(m) ? "—" :
+  m < 1000 ? `${Math.round(m)} m` : `${(m / 1000).toFixed(1)} km`;
 
 export default function MapHome() {
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const s = useStyles();
-  const { colors } = useTheme();
   const qc = useQueryClient();
-  const [greet, setGreet] = useState(true);
-  const [menu, setMenu] = useState(false);
-  const [locBanner, setLocBanner] = useState(false);
-  const [sel, setSel] = useState<LatLng | null>(null);
-  const [myPos, setMyPos] = useState<LatLng | null>(null);
-  const [mapPerspective, setMapPerspective] = useState<"2d" | "3d">("3d");
+  const [mode, setMode] = useState<Mode>("explore");
+  const [perspective, setPerspective] = useState<"2d" | "3d">("2d");
+  const [selected, setSelected] = useState<LatLng | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState("");
+  const [location, setLocation] = useState<LatLng | null>(null);
   const [focus, setFocus] = useState<(LatLng & { key: number }) | undefined>();
+  const [showLocationPrompt, setShowLocationPrompt] = useState(false);
+  const [search, setSearch] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [candidates, setCandidates] = useState<Place[]>([]);
+  const [searchError, setSearchError] = useState("");
+  const [activityBusy, setActivityBusy] = useState(false);
 
-  const groups = useQuery({ queryKey: ["groups"], queryFn: () => api<any[]>("/groups"), refetchInterval: 15000 });
+  const groups = useQuery<Group[]>({
+    queryKey: ["groups"], queryFn: () => api<Group[]>("/groups"), refetchInterval: 15000,
+  });
   const group = groups.data?.[0];
-  const perms = useQuery({ queryKey: ["permissions"], queryFn: () => api<Record<string, any>>("/permissions") });
-  const positions = useQuery({ queryKey: ["positions", group?.id], enabled: !!group, refetchInterval: 10000, queryFn: () => api<MapPerson[]>(`/groups/${group.id}/positions`) });
-  const sharesLocation = !!perms.data && Object.values(perms.data).some((v: any) => v.effective && (v.key === "exact_location" || v.key === "approx_location"));
-  const loc = useLocationSharing(sharesLocation);
-  const reverse = useQuery({ queryKey: ["reverse", sel?.lat, sel?.lng], enabled: !!sel, retry: false, queryFn: () => api<{ name: string }>(`/mobility/reverse?lat=${sel!.lat}&lng=${sel!.lng}`) });
+  const permissions = useQuery<Record<string, { key?: string; effective?: boolean }>>({
+    queryKey: ["permissions"], queryFn: () => api("/permissions"),
+  });
+  const sharesLocation = !!permissions.data &&
+    Object.entries(permissions.data).some(([key, value]) =>
+      (key === "exact_location" || key === "approx_location") && value?.effective === true
+    );
+  const gps = useLocationSharing(sharesLocation);
+  const positions = useQuery<MapPerson[]>({
+    queryKey: ["positions", group?.id], enabled: !!group,
+    queryFn: () => api<MapPerson[]>(`/groups/${group!.id}/positions`),
+    refetchInterval: 10000,
+  });
 
-  useEffect(() => { const t = setTimeout(() => setGreet(false), 4000); return () => clearTimeout(t); }, []);
-  useEffect(() => { storage.getItem<string | null>("sentinel.pending_invite", null).then((t) => { if (t) router.push(`/invite/${t}`); }); }, [router]);
-  useEffect(() => { if (sharesLocation && loc.perm !== "granted") setLocBanner(true); }, [sharesLocation, loc.perm]);
-  useEffect(() => { if (loc.lastSentAt) qc.invalidateQueries({ queryKey: ["positions"] }); }, [loc.lastSentAt, qc]);
-  // Device position (stays on the device unless a location permission is effective) → centering + navigation origin.
+  // Local positioning does not enable group sharing or upload anything unless
+  // independent effective consent is granted by the authenticated user.
   useEffect(() => {
-    if (loc.perm !== "granted") return;
-    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then((p) => setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude })).catch(() => null);
-  }, [loc.perm]);
+    if (gps.perm !== "granted") return;
+    let alive = true;
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      .then((p) => {
+        if (alive) setLocation({ lat: p.coords.latitude, lng: p.coords.longitude });
+      }).catch(() => null);
+    return () => { alive = false; };
+  }, [gps.perm]);
+  useEffect(() => {
+    if (gps.lastSentAt) void qc.invalidateQueries({ queryKey: ["positions"] });
+  }, [gps.lastSentAt, qc]);
+  useEffect(() => {
+    storage.getItem<string | null>("sentinel.pending_invite", null).then(token => {
+      if (token) router.push(`/invite/${token}`);
+    });
+  }, [router]);
 
-  const served = positions.data ?? [];
-  const meServed = served.find((p) => p.is_me && p.state === "shared" && p.lat != null);
-  const name = user?.profile?.name ?? "";
-  const mePos: LatLng | null = meServed ? { lat: meServed.lat!, lng: meServed.lng! } : myPos;
-  const people: MapPerson[] = meServed || !mePos
-    ? served
-    : [...served.filter((p) => !p.is_me), { member_id: "me-local", user_id: user?.id ?? "me", name: name || "Tú", color: colors.brandPrimary, state: "shared", lat: mePos.lat, lng: mePos.lng, is_me: true }];
-  // First fix → center once with navigator zoom; afterwards only the recenter FAB moves the camera.
-  useEffect(() => { if (mePos && !focus) setFocus({ ...mePos, key: 1 }); }, [mePos, focus]);
+  const serverPeople = positions.data ?? [];
+  const serverMe = serverPeople.find(p => p.is_me && p.state === "shared" && p.lat != null);
+  const me: LatLng | null = serverMe ? { lat: serverMe.lat!, lng: serverMe.lng! } : location;
+  const myself: MapPerson[] = me && !serverMe ? [{
+    member_id: "me-local", user_id: user?.id ?? "me", name: user?.profile?.name || "Tú",
+    color: RED, lat: me.lat, lng: me.lng, state: "shared", is_me: true,
+  }] : [];
+  const people: MapPerson[] = mode === "navigate" ?
+    [...serverPeople.filter(p => p.is_me), ...myself] : [...serverPeople, ...myself];
+  useEffect(() => {
+    if (me && !focus) setFocus({ ...me, key: 1 });
+  }, [me?.lat, me?.lng]);
 
-  const closeAll = () => { setMenu(false); setSel(null); };
-  const onMapPress = (c?: LatLng) => { if (menu || sel || (locBanner && loc.perm !== "granted")) { closeAll(); setLocBanner(false); return; } if (c) setSel(c); };
-  const recenter = () => { if (!mePos) { toast(loc.perm === "granted" ? "Obteniendo tu ubicación…" : "Permite la ubicación para centrarte"); if (loc.perm !== "granted") setLocBanner(true); return; } setFocus({ ...mePos, key: (focus?.key ?? 0) + 1 }); };
-  const checkIn = async () => {
-    if (!group) return toast("Crea un grupo primero");
-    try { await api("/events", { method: "POST", json: { group_id: group.id, kind: "checkin", severity: "info", message: "¿Todo bien?" } }); toast("Pregunta registrada. Avisos automáticos aún no disponibles.", "success"); } catch (e: any) { toast(e.message, "error"); }
+  // This is a real server route request, currently backed by an explicitly
+  // non-production OSRM demonstration adapter when no licensed provider exists.
+  const route = useQuery<RoutePreview>({
+    queryKey: ["baymove-map-route", me?.lat, me?.lng, selected?.lat, selected?.lng],
+    enabled: mode === "navigate" && !!me && !!selected,
+    retry: false,
+    queryFn: () => api<RoutePreview>("/mobility/route", {
+      method: "POST", json: { points: [[me!.lat, me!.lng], [selected!.lat, selected!.lng]] },
+    }),
+  });
+  const navigateTo = (point: LatLng, title = "") => {
+    setSelected(point); setSelectedPlace(title);
+    setCandidates([]); setSearchOpen(false); setMode("navigate");
+    setFocus({ ...point, key: (focus?.key ?? 0) + 1 });
   };
-  const originParams = mePos ? { fromLat: String(mePos.lat), fromLng: String(mePos.lng) } : {};
-  const selName = reverse.data?.name ?? (sel ? `${sel.lat.toFixed(5)}, ${sel.lng.toFixed(5)}` : "");
-  const pendingCount = group?.stats?.pending ?? 0;
+  const recenter = () => {
+    if (!me) {
+      setShowLocationPrompt(true);
+      toast(gps.perm === "granted" ? "Obteniendo posición GPS…" : "Autoriza la ubicación para centrar el mapa");
+      return;
+    }
+    setFocus({ ...me, key: (focus?.key ?? 0) + 1 });
+  };
+  const requestLocation = async () => {
+    const ok = gps.perm === "blocked" ? (gps.openSettings(), false) : await gps.request();
+    if (ok) setShowLocationPrompt(false);
+  };
+  const findPlace = async () => {
+    const q = search.trim();
+    if (q.length < 3 || searching) return;
+    setSearching(true); setSearchError(""); setCandidates([]);
+    try {
+      // Explicit user search prevents high-frequency calls to limited public geocoders.
+      const places = await api<Place[]>(`/mobility/geocode?q=${encodeURIComponent(q)}`);
+      setCandidates(places);
+      if (!places.length) setSearchError("No se encontraron lugares. Prueba una dirección más precisa.");
+    } catch (err: any) {
+      const unavailable = unavailableOf(err);
+      if (unavailable) showUnavailable(unavailable);
+      setSearchError(err?.message ?? "Búsqueda no disponible");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const checkIn = async () => {
+    if (!group || activityBusy) return toast("Necesitas un círculo para registrar la pregunta.");
+    setActivityBusy(true);
+    try {
+      await api("/events", { method: "POST", json: {
+        group_id: group.id, kind: "checkin", severity: "info", message: "¿Todo bien?",
+      } });
+      toast("Pregunta registrada. Aún no hay notificaciones automáticas.", "success");
+    } catch (err: any) {
+      toast(err?.message ?? "No se pudo registrar la pregunta", "error");
+    } finally { setActivityBusy(false); }
+  };
 
   return (
-    <View style={s.root} testID="map-home">
-      <MapCanvas people={people} center={focus} perspective={mapPerspective} selected={sel} onMapPress={onMapPress} onMapLongPress={(c) => { setMenu(false); setSel(c); }}
-        onPersonPress={(p) => { closeAll(); if (p.member_id === "me-local") router.push("/profile"); else router.push(`/person/${p.member_id}?group=${group?.id}`); }} />
+    <View style={{ flex: 1 }} testID="unified-map-home">
+      <MapCanvas
+        people={people}
+        center={focus}
+        perspective={perspective}
+        polyline={mode === "navigate" ? route.data?.geometry : undefined}
+        selected={selected}
+        onMapPress={(point) => {
+          if (searchOpen) { setSearchOpen(false); return; }
+          if (point) {
+            setSelected(point); setSelectedPlace("");
+            if (mode === "navigate") setCandidates([]);
+          }
+        }}
+        onMapLongPress={point => { setSelected(point); setSelectedPlace(""); }}
+        onPersonPress={person => {
+          setMode("circle");
+          if (person.is_me) router.push("/profile");
+          else if (group) router.push(`/person/${person.member_id}?group=${group.id}`);
+        }}
+      />
 
-      {/* Compact navigator pill */}
-      <View style={[s.top, { paddingTop: insets.top + spacing.sm }]} pointerEvents="box-none">
-        <View style={s.bar} testID="search-bar">
-          <Pressable testID="search-bar-input" onPress={() => { closeAll(); router.push({ pathname: "/navigate", params: originParams }); }} style={s.barLeft}>
-            <Ionicons name="search" size={18} color={colors.brandPrimary} />
-            {greet ? (
-              <Animated.View key="greet" exiting={FadeOut} style={{ flex: 1 }}><T weight="semibold" style={s.barTxt} numberOfLines={1} testID="bar-greeting">Hola {name || "👋"}</T></Animated.View>
-            ) : (
-              <Animated.View key="ask" entering={FadeIn} style={{ flex: 1 }}><T weight="semibold" style={s.barTxt} numberOfLines={1} testID="bar-prompt">¿A dónde vamos?</T></Animated.View>
-            )}
+      <View style={{ position: "absolute", top: insets.top + 8, left: 12, right: 12, gap: 9 }} pointerEvents="box-none">
+        <View style={S.searchBar}>
+          <Pressable testID="unified-search-open" onPress={() => { setMode("navigate"); setSearchOpen(true); }} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44 }}>
+            <Ionicons name="search" size={20} color={RED} />
+            <T weight="semibold" style={{ color: INK, fontSize: 15 }} numberOfLines={1}>¿A dónde vamos?</T>
           </Pressable>
-          <Pressable testID="search-bar-group" onPress={() => { closeAll(); group ? router.push(`/group/${group.id}`) : router.push("/onboarding/group"); }} style={s.barIcon} accessibilityLabel="Grupo">
-            <Ionicons name="people" size={18} color={colors.onSurface} />
-            {pendingCount ? <View style={s.badge}><T weight="bold" style={{ fontSize: 9, color: colors.onPending }}>{pendingCount}</T></View> : null}
-          </Pressable>
-          <Pressable testID="profile-shortcut" onPress={() => { closeAll(); router.push("/profile"); }} style={[s.barIcon, s.avatar, { overflow: "hidden" }]} accessibilityLabel="Perfil">
+          <Pressable testID="unified-profile" onPress={() => router.push("/profile")} style={S.avatar}>
             {user?.avatar?.photo_url ? (
-              <Image source={{ uri: user.avatar.photo_url }} style={{ width: "100%", height: "100%" }} contentFit="cover" transition={120} />
-            ) : (
-              <T weight="bold" style={{ fontSize: 13, color: colors.onBrandPrimary }}>{(name || "?").charAt(0).toUpperCase()}</T>
-            )}
+              <Image source={{ uri: user.avatar.photo_url }} style={{ width: 36, height: 36, borderRadius: 18 }} />
+            ) : <T weight="bold" style={{ color: RED }}>{(user?.profile?.name || "?").charAt(0).toUpperCase()}</T>}
           </Pressable>
         </View>
-        {locBanner && sharesLocation && loc.perm !== "granted" ? (
-          <Animated.View entering={FadeInDown} exiting={FadeOut} style={{ marginTop: spacing.sm }}>
-            <Glass style={{ padding: spacing.md }} testID="location-permission-banner">
-              <T weight="bold" style={{ fontSize: 13 }}>Permiso de ubicación del dispositivo</T>
-              <T style={{ color: colors.muted, fontSize: 12, marginTop: 2 }}>Compartes tu ubicación con tu grupo; Sentinel necesita el permiso del sistema (solo con la app abierta).</T>
-              <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
-                {loc.perm === "blocked" ? <Button small testID="location-open-settings" title="Abrir ajustes" onPress={loc.openSettings} /> : <Button small testID="location-request" title="Permitir" onPress={async () => { const ok = await loc.request(); if (!ok) toast("Sin permiso, tu grupo verá “Ubicación no compartida”"); }} />}
-                <Button small testID="location-later" title="Ahora no" variant="ghost" onPress={() => setLocBanner(false)} />
-              </View>
-            </Glass>
-          </Animated.View>
-        ) : null}
-      </View>
-
-      {/* Right-side FABs: recenter + tools */}
-      <View style={[s.fabs, { bottom: insets.bottom + spacing.lg }]} pointerEvents="box-none">
-        {menu ? (
-          <Animated.View entering={FadeInUp.duration(160)} exiting={FadeOut.duration(120)} style={s.menu} testID="tools-menu">
-            <MenuItem testID="qa-meeting" icon="calendar" label="Quedar" onPress={() => { setMenu(false); group ? router.push({ pathname: "/meeting/new", params: { group: group.id } }) : toast("Crea un grupo primero"); }} />
-            <MenuItem testID="qa-convoy" icon="car-sport" label="Convoy" onPress={() => { setMenu(false); group ? router.push({ pathname: "/convoy/new", params: { group: group.id } }) : toast("Crea un grupo primero"); }} />
-            <MenuItem testID="qa-checkin" icon="help-circle" label="¿Todo bien?" onPress={() => { setMenu(false); checkIn(); }} />
-            <MenuItem testID="qa-anti" icon="trending-down" label="Anti-congestión" onPress={() => { setMenu(false); router.push({ pathname: "/navigate", params: { ...originParams, anti: "1" } }); }} />
-            <MenuItem testID="qa-activity" icon="list" label="Actividad" onPress={() => { setMenu(false); group ? router.push(`/group/${group.id}?tab=events`) : toast("Crea un grupo primero"); }} />
-            <MenuItem testID="qa-privacy" icon="lock-closed" label="Privacidad" onPress={() => { setMenu(false); router.push("/privacy"); }} />
-          </Animated.View>
-        ) : null}
-        {Platform.OS !== "web" ? <Pressable testID="fab-map-perspective" onPress={() => setMapPerspective((current) => current === "3d" ? "2d" : "3d")} style={s.fab} accessibilityLabel={`Cambiar a vista ${mapPerspective === "3d" ? "2D" : "3D"}`}><T weight="bold" style={{ color: colors.onSurface, fontSize: 14 }}>{mapPerspective === "3d" ? "3D" : "2D"}</T></Pressable> : null}
-        <Pressable testID="fab-recenter" onPress={recenter} style={s.fab} accessibilityLabel="Centrar en mi ubicación"><Ionicons name="locate" size={20} color={mePos ? colors.brandPrimary : colors.muted} /></Pressable>
-        <Pressable testID="fab-tools" onPress={() => { setSel(null); setMenu(!menu); }} style={[s.fab, menu && s.fabOn]} accessibilityLabel="Herramientas"><Ionicons name={menu ? "close" : "grid"} size={20} color={menu ? colors.onBrandPrimary : colors.onSurface} /></Pressable>
-      </View>
-
-      {/* Selected point (compact, never covers the map) */}
-      {sel ? (
-        <Animated.View entering={FadeInDown.duration(180)} exiting={FadeOut.duration(120)} style={[s.selCard, { bottom: insets.bottom + spacing.lg }]} testID="selected-point-card">
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            <Ionicons name="location" size={18} color={colors.brandPrimary} />
-            <View style={{ flex: 1 }}>
-              <T weight="semibold" style={{ fontSize: 14 }} numberOfLines={2} testID="selected-point-name">{reverse.isLoading ? "Buscando dirección…" : selName}</T>
-              <T style={{ fontSize: 11, color: colors.muted }}>{mePos ? `${fmtDist(distM(mePos, sel))} de ti` : "Toca “Ir” para calcular la ruta"}</T>
-            </View>
-            <Pressable testID="selected-point-close" onPress={() => setSel(null)} hitSlop={8} style={s.closeBtn}><Ionicons name="close" size={16} color={colors.onSurface} /></Pressable>
-          </View>
-          <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm }}>
-            <Tool testID="sel-go" icon="navigate" label="Ir" primary onPress={() => { router.push({ pathname: "/navigate", params: { ...originParams, lat: String(sel.lat), lng: String(sel.lng), place: selName } }); setSel(null); }} />
-            <Tool testID="sel-meet" icon="calendar" label="Quedar aquí" onPress={() => { if (!group) return toast("Crea un grupo primero"); router.push({ pathname: "/meeting/new", params: { group: group.id, lat: String(sel.lat), lng: String(sel.lng), place: selName } }); setSel(null); }} />
-            <Tool testID="sel-convoy" icon="car-sport" label="Convoy" onPress={() => { if (!group) return toast("Crea un grupo primero"); router.push({ pathname: "/convoy/new", params: { group: group.id, lat: String(sel.lat), lng: String(sel.lng), place: selName } }); setSel(null); }} />
-          </View>
-        </Animated.View>
-      ) : null}
-
-      {!group && groups.isSuccess && !sel && !menu ? (
-        <View style={[s.hint, { bottom: insets.bottom + spacing.lg }]} pointerEvents="box-none">
-          <Pressable testID="create-group-cta" onPress={() => router.push("/onboarding/group")} style={s.hintBtn}><Ionicons name="add-circle" size={18} color={colors.onBrandPrimary} /><T weight="semibold" style={{ fontSize: 13, color: colors.onBrandPrimary }}>Crea tu grupo</T></Pressable>
+        <View style={S.modeRow} testID="unified-map-modes">
+          <ModeButton value="explore" selected={mode} onPress={() => { setMode("explore"); setSearchOpen(false); }} icon="compass-outline" title="Explorar" />
+          <ModeButton value="navigate" selected={mode} onPress={() => setMode("navigate")} icon="navigate-outline" title="Navegar" />
+          <ModeButton value="circle" selected={mode} onPress={() => { setMode("circle"); setSearchOpen(false); }} icon="people-outline" title="Círculo" />
         </View>
-      ) : null}
+
+        {searchOpen && mode === "navigate" ? (
+          <View style={S.searchPanel} testID="unified-map-search-panel">
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <TextInput
+                testID="unified-search-input"
+                value={search} onChangeText={setSearch}
+                placeholder="Dirección, ciudad o lugar" placeholderTextColor={MUTED}
+                autoCapitalize="sentences" returnKeyType="search"
+                onSubmitEditing={() => void findPlace()}
+                style={{ flex: 1, padding: 10, backgroundColor: "#F7F6F7", borderRadius: 12, minHeight: 44, color: INK, fontSize: 15 }}
+              />
+              <Pressable testID="unified-search-submit" onPress={() => void findPlace()} disabled={searching || search.trim().length < 3} style={S.searchSubmit}>
+                {searching ? <ActivityIndicator color="#FFFFFF" size="small"/> : <Ionicons name="search" color="#FFFFFF" size={20}/>}
+              </Pressable>
+              <Pressable accessibilityLabel="Cerrar búsqueda" testID="unified-search-close" onPress={() => setSearchOpen(false)}>
+                <Ionicons name="close" size={22} color={MUTED}/>
+              </Pressable>
+            </View>
+            {searchError ? <T style={{ color: RED, marginTop: 8, fontSize: 12 }}>{searchError}</T> : null}
+            {candidates.length ? (
+              <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                {candidates.map((p, i) => (
+                  <Pressable key={`${i}-${p.lat}-${p.lng}`} testID={`unified-search-result-${i}`} onPress={() => navigateTo({ lat: p.lat, lng: p.lng }, p.name)} style={S.candidate}>
+                    <Ionicons name="location-outline" color={RED} size={18}/>
+                    <T style={{ color: INK, flex: 1, fontSize: 13 }} numberOfLines={2}>{p.name}</T>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : null}
+          </View>
+        ) : null}
+
+        {showLocationPrompt && !me ? (
+          <View style={S.searchPanel} testID="unified-location-permission">
+            <T weight="semibold" style={{ color: INK }}>Ubicación para centrar el mapa</T>
+            <T style={{ color: MUTED, fontSize: 12, marginTop: 4 }}>Puedes utilizarla en este teléfono sin compartirla con tu círculo. Compartir requiere otro consentimiento.</T>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 10 }}>
+              <Pressable onPress={() => setShowLocationPrompt(false)}><T style={{ color: MUTED }}>Ahora no</T></Pressable>
+              <Pressable onPress={() => void requestLocation()}><T weight="bold" style={{ color: RED }}>{gps.perm === "blocked" ? "Ajustes" : "Permitir ubicación"}</T></Pressable>
+            </View>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={{ position: "absolute", right: 12, bottom: insets.bottom + 176, gap: 9, alignItems: "center" }} pointerEvents="box-none">
+        {Platform.OS !== "web" ? (
+          <Fab id="unified-perspective" label={perspective === "3d" ? "Pasar a 2D" : "Pasar a 3D"} onPress={() => setPerspective(v => v === "2d" ? "3d" : "2d")}>
+            <T weight="bold" style={{ color: INK }}>{perspective === "2d" ? "2D" : "3D"}</T>
+          </Fab>
+        ) : null}
+        <Fab id="unified-recenter" label="Centrar en mi ubicación" onPress={recenter}>
+          <Ionicons name="locate" size={22} color={me ? RED : MUTED}/>
+        </Fab>
+      </View>
+
+      <View style={{ position: "absolute", left: 10, right: 10, bottom: insets.bottom + 10 }} testID={`unified-panel-${mode}`}>
+        {mode === "explore" ? (
+          <View style={S.bottomPanel}>
+            <T weight="bold" style={S.panelTitle}>Explorar</T>
+            <T style={S.panelHint}>{selected ? "Punto seleccionado" : "Elige un destino o consulta tu círculo."}</T>
+            <View style={S.actions}>
+              <PanelButton label={selected ? "Ir a este punto" : "Buscar destino"} icon="navigate-outline" onPress={() => {
+                if (selected) navigateTo(selected);
+                else { setMode("navigate"); setSearchOpen(true); }
+              }}/>
+              <PanelButton label="Círculos" icon="people-outline" onPress={() => setMode("circle")}/>
+              <PanelButton label="Seguridad" icon="shield-checkmark-outline" onPress={() => router.push("/privacy")}/>
+            </View>
+          </View>
+        ) : mode === "navigate" ? (
+          <View style={S.bottomPanel}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <T weight="bold" style={S.panelTitle}>Ruta preliminar</T>
+              {selected ? <Pressable testID="unified-clear-route" onPress={() => { setSelected(null); setSelectedPlace(""); }}><Ionicons name="close-circle-outline" size={20} color={MUTED}/></Pressable> : null}
+            </View>
+            {!selected ? <T style={S.panelHint}>Busca un destino o tócalo directamente en el mapa.</T>
+              : !me ? <T style={S.panelHint}>Destino elegido. Para calcular la ruta, autoriza el GPS de este teléfono.</T>
+              : route.isLoading ? <T style={S.panelHint}>Calculando ruta real…</T>
+              : route.data ? (
+                <>
+                  <T numberOfLines={1} style={S.panelHint}>{selectedPlace || `${selected.lat.toFixed(4)}, ${selected.lng.toFixed(4)}`}</T>
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "baseline", marginTop: 8 }}>
+                    <T weight="bold" style={{ color: RED, fontSize: 23 }}>{fmtDuration(route.data.duration_s)}</T>
+                    <T weight="semibold" style={{ color: INK }}>{fmtDistance(route.data.distance_m)}</T>
+                  </View>
+                  <T style={{ color: MUTED, fontSize: 11 }}>Estimación sin tráfico en directo ni guiado giro a giro. No utilizar para conducir.</T>
+                </>
+              ) : <T style={S.panelHint}>{(route.error as Error | null)?.message || "Ruta no disponible. Comprueba el servicio de rutas."}</T>}
+            <View style={S.actions}>
+              {!me ? <PanelButton label="Activar GPS" icon="locate-outline" onPress={() => setShowLocationPrompt(true)} /> : null}
+              <PanelButton label="Buscar" icon="search" onPress={() => setSearchOpen(true)}/>
+              <PanelButton label="Convoy" icon="car-sport-outline" onPress={() => group ? router.push({ pathname: "/convoy/new", params: { group: group.id } }) : toast("Crea un círculo primero")}/>
+              <PanelButton label="Explorar" icon="map-outline" onPress={() => { setMode("explore"); setSearchOpen(false); }}/>
+            </View>
+          </View>
+        ) : (
+          <View style={S.bottomPanel}>
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <View style={{ flex: 1 }}>
+                <T weight="bold" style={S.panelTitle}>{group?.name || "Mi círculo"}</T>
+                <T style={S.panelHint}>{group ? `${group.stats.members} miembros · ${group.stats.pending} pendientes` : "Todavía no tienes un círculo"}</T>
+              </View>
+              {group ? <Pressable testID="unified-group-detail" onPress={() => router.push(`/group/${group.id}`)}><Ionicons name="chevron-forward" size={24} color={RED}/></Pressable> : null}
+            </View>
+            {groups.isLoading ? <T style={S.panelHint}>Cargando círculo…</T> : groups.isError ? <T style={S.panelHint}>No se pudo obtener el círculo del servidor.</T> : null}
+            {group ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 8, paddingBottom: 3 }}>
+                {group.members.filter(m => m.status !== "removed").map(m => {
+                  const p = serverPeople.find(x => x.user_id === m.user_id);
+                  const shared = !!p && p.state === "shared" && p.lat != null;
+                  const isPending = m.status !== "active";
+                  return (
+                    <Pressable key={m.id} testID={`unified-member-${m.id}`} style={S.memberCard} onPress={() => {
+                      if (shared) setFocus({ lat: p.lat!, lng: p.lng!, key: (focus?.key ?? 0) + 1 });
+                      else toast(isPending ? "Invitación pendiente" : "Esta persona no comparte su ubicación");
+                    }}>
+                      <View style={[S.memberDot, { backgroundColor: isPending ? "#E3DEE3" : shared ? RED : "#F2EFF1" }]}>
+                        <T weight="bold" style={{ color: shared ? "#FFFFFF" : INK }}>{isPending ? "…" : m.display_name.charAt(0).toUpperCase()}</T>
+                      </View>
+                      <T style={{ color: INK, fontSize: 11 }} numberOfLines={1}>{m.display_name}</T>
+                      <T style={{ color: MUTED, fontSize: 10 }}>{isPending ? "Pendiente" : shared ? "Comparte" : "Sin ubicación"}</T>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : null}
+            <View style={S.actions}>
+              <PanelButton label={group ? "Ver círculo" : "Crear círculo"} icon="people-outline" onPress={() => group ? router.push(`/group/${group.id}`) : router.push("/onboarding/group")}/>
+              <PanelButton label={activityBusy ? "Registrando…" : "¿Todo bien?"} icon="help-circle-outline" onPress={() => void checkIn()}/>
+              <PanelButton label="Quedar" icon="calendar-outline" onPress={() => group ? router.push({ pathname: "/meeting/new", params: { group: group.id } }) : toast("Crea un círculo primero")}/>
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
-function MenuItem({ icon, label, onPress, testID }: { icon: string; label: string; onPress: () => void; testID: string }) {
-  const s = useStyles(); const { colors } = useTheme();
-  return <Pressable testID={testID} onPress={onPress} style={s.menuItem}><T weight="semibold" style={{ fontSize: 13 }}>{label}</T><View style={s.menuIcon}><Ionicons name={icon as any} size={16} color={colors.brandPrimary} /></View></Pressable>;
-}
-function Tool({ icon, label, onPress, testID, primary }: { icon: string; label: string; onPress: () => void; testID: string; primary?: boolean }) {
-  const s = useStyles(); const { colors } = useTheme();
-  const fg = primary ? colors.onBrandPrimary : colors.onSurface;
-  return <Pressable testID={testID} onPress={onPress} style={[s.tool, primary && s.toolOn]}><Ionicons name={icon as any} size={15} color={fg} /><T weight="semibold" style={{ fontSize: 12, color: fg }} numberOfLines={1}>{label}</T></Pressable>;
+function ModeButton({ value, selected, onPress, icon, title }: {
+  value: Mode; selected: Mode; onPress: () => void; icon: string; title: string;
+}) {
+  const active = value === selected;
+  return (
+    <Pressable testID={`unified-mode-${value}`} accessibilityRole="button" accessibilityState={{ selected: active }}
+      onPress={onPress} style={[S.modePill, active && S.modeSelected]}>
+      <Ionicons name={icon as any} color={active ? RED : MUTED} size={16}/>
+      <T weight={active ? "bold" : "medium"} style={{ color: active ? RED : MUTED, fontSize: 12 }}>{title}</T>
+    </Pressable>
+  );
 }
 
-const useStyles = makeStyles((c) => ({
-  root: { flex: 1, backgroundColor: c.mapTint },
-  top: { position: "absolute", left: 0, right: 0, paddingHorizontal: spacing.md },
-  bar: { flexDirection: "row", alignItems: "center", backgroundColor: c.glassStrong, borderRadius: radius.pill, borderWidth: 1, borderColor: c.border, padding: 4, gap: 4, shadowColor: c.surfaceInverse, shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
-  barLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingLeft: spacing.sm, height: 44 },
-  barTxt: { fontSize: 15 },
-  barIcon: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: c.surfaceTertiary },
-  avatar: { backgroundColor: c.brandPrimary, width: 36, height: 36, borderRadius: 18, marginRight: 2 },
-  badge: { position: "absolute", top: -2, right: -2, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: c.pending, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  fabs: { position: "absolute", right: spacing.md, alignItems: "flex-end", gap: spacing.sm },
-  fab: { width: 48, height: 48, borderRadius: 24, backgroundColor: c.glassStrong, borderWidth: 1, borderColor: c.border, alignItems: "center", justifyContent: "center", shadowColor: c.surfaceInverse, shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  fabOn: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
-  menu: { gap: 6, alignItems: "flex-end", marginBottom: 2 },
-  menuItem: { flexDirection: "row", alignItems: "center", gap: spacing.sm, height: 40, paddingLeft: 14, paddingRight: 4, borderRadius: radius.pill, backgroundColor: c.glassStrong, borderWidth: 1, borderColor: c.border, shadowColor: c.surfaceInverse, shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
-  menuIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
-  selCard: { position: "absolute", left: spacing.md, right: spacing.md + 60, backgroundColor: c.glassStrong, borderRadius: radius.lg, borderWidth: 1, borderColor: c.border, padding: spacing.md, shadowColor: c.surfaceInverse, shadowOpacity: 0.18, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
-  closeBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
-  tool: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, height: 36, borderRadius: radius.pill, backgroundColor: c.surfaceTertiary, borderWidth: 1, borderColor: c.border, paddingHorizontal: 6 },
-  toolOn: { backgroundColor: c.brandPrimary, borderColor: c.brandPrimary },
-  hint: { position: "absolute", left: spacing.md, right: spacing.md + 60, alignItems: "flex-start" },
-  hintBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: c.brandPrimary, shadowColor: c.surfaceInverse, shadowOpacity: 0.15, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
-  txt: { fontFamily: fonts.regular },
-}));
+function PanelButton({ label, icon, onPress }: { label: string; icon: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={S.actionButton}>
+      <Ionicons name={icon as any} color={RED} size={19}/>
+      <T style={{ color: INK, fontSize: 11, textAlign: "center" }} weight="medium" numberOfLines={1}>{label}</T>
+    </Pressable>
+  );
+}
+
+function Fab({ id, label, onPress, children }: { id: string; label: string; onPress: () => void; children: React.ReactNode }) {
+  return <Pressable testID={id} accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={S.fab}>{children}</Pressable>;
+}
+
+const S = {
+  searchBar: {
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 4,
+    borderRadius: 25, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: BORDER,
+    elevation: 4, shadowColor: "#000000", shadowOpacity: 0.08, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  avatar: { width: 36, height: 36, backgroundColor: PALE, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  modeRow: { flexDirection: "row", gap: 6, alignSelf: "center" },
+  modePill: {
+    flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 12, paddingVertical: 10,
+    backgroundColor: "#FFFFFF", borderRadius: 22, borderWidth: 1, borderColor: BORDER,
+  },
+  modeSelected: { backgroundColor: "#FFF5F6", borderColor: RED },
+  searchPanel: {
+    backgroundColor: "#FFFFFF", borderRadius: 18, borderColor: BORDER, borderWidth: 1,
+    padding: 12, elevation: 5, shadowColor: "#000000", shadowOpacity: 0.08, shadowRadius: 12,
+  },
+  searchSubmit: {
+    width: 43, height: 44, borderRadius: 12, backgroundColor: RED,
+    alignItems: "center", justifyContent: "center",
+  },
+  candidate: { flexDirection: "row", gap: 9, alignItems: "center", padding: 12, borderBottomColor: BORDER, borderBottomWidth: 1 },
+  fab: {
+    width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center",
+    backgroundColor: "#FFFFFF", borderColor: BORDER, borderWidth: 1, elevation: 4,
+    shadowColor: "#000000", shadowOpacity: 0.09, shadowRadius: 10,
+  },
+  bottomPanel: {
+    backgroundColor: "#FFFFFF", borderRadius: 21, padding: 14, borderWidth: 1, borderColor: BORDER,
+    elevation: 6, shadowColor: "#000000", shadowOpacity: 0.12, shadowRadius: 14,
+    shadowOffset: { width: 0, height: 3 },
+  },
+  panelTitle: { fontSize: 16, color: INK },
+  panelHint: { fontSize: 12, color: MUTED, marginTop: 3 },
+  actions: { flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 },
+  actionButton: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: PALE, paddingHorizontal: 5, gap: 3 },
+  memberCard: { minWidth: 80, alignItems: "center", gap: 3, paddingHorizontal: 6, paddingVertical: 7, borderRadius: 12, backgroundColor: "#FAF9FA" },
+  memberDot: { width: 35, height: 35, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+} as const;
