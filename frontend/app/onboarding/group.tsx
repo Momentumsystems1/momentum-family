@@ -186,7 +186,7 @@ export default function GroupCreation() {
                 members={group.members}
                 ownerId={user?.id}
                 size={Math.min(width - spacing.xl * 2, 360)}
-                onMemberPress={(m) => setSelected(m)}
+                onMemberPress={(m) => setSelected(group.members.find((member) => member.id === m.id) ?? null)}
               />
             </View>
             <Button testID="circle-express-add" title="Añadir persona" icon="person-add" onPress={() => setAdding(true)} />
