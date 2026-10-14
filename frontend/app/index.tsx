@@ -27,6 +27,11 @@ export default function Index() {
     })();
   }, [user, loading]);
 
+  // Explicit opt-in for local Expo Go UI smoke tests only.
+  // Does not authenticate, grant any permissions, or change server access.
+  if (__DEV__ && process.env.EXPO_PUBLIC_BAYMOVE_MAP_REVIEW === "1") {
+    return <Redirect href="/map" />;
+  }
   if (target) return <Redirect href={target as any} />;
   return (
     <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, gap: 12 }} testID="bootstrap-screen">
