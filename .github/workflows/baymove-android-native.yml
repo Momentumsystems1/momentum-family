@@ -6,9 +6,13 @@ on:
   push:
     branches:
       - recovery/my-cluster-core-20261013
+      - feature/baymove-unified-map-20261014
     paths:
       - .github/workflows/baymove-android-native.yml
       - frontend/app.config.js
+      - frontend/app/map.tsx
+      - frontend/src/components/MapCanvas.tsx
+      - frontend/src/components/CircleOrbit.tsx
       - frontend/app.json
       - frontend/package.json
       - frontend/yarn.lock
@@ -30,7 +34,7 @@ concurrency:
 jobs:
   android-debug:
     name: Native debug APK compile
-    if: github.ref == 'refs/heads/recovery/my-cluster-core-20261013'
+    if: github.ref == 'refs/heads/recovery/my-cluster-core-20261013' || github.ref == 'refs/heads/feature/baymove-unified-map-20261014'
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     defaults:
@@ -44,7 +48,7 @@ jobs:
       G3000_MAPS_ANDROID_API_KEY: ""
       G3000_MAPS_IOS_API_KEY: ""
     steps:
-      - name: Checkout only recovery branch
+      - name: Checkout explicitly selected branch
         uses: actions/checkout@v5
         with:
           persist-credentials: false
