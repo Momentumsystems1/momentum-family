@@ -1,6 +1,6 @@
 // Bottom sheet flows shared by group creation and group detail: add member, pending member detail.
 import Ionicons from "@react-native-vector-icons/ionicons";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -33,7 +33,13 @@ export function AddMemberSheet({ visible, onClose, onSubmit, loading }: { visibl
   const [membership, setMembership] = useState<"fixed" | "temporary">("fixed");
   const [channel, setChannel] = useState<"whatsapp" | "sms">("whatsapp");
   const [hours, setHours] = useState(24);
-  const reset = () => { setName(""); setPhone(""); setMembership("fixed"); setChannel("whatsapp"); setHours(24); };
+  // Keep what the user typed if creating the invitation fails. Clear only
+  // after the parent confirms success and closes the sheet.
+  useEffect(() => {
+    if (!visible) {
+      setName(""); setPhone(""); setMembership("fixed"); setChannel("whatsapp"); setHours(24);
+    }
+  }, [visible]);
 
   // Contact Picker API (Chrome/Edge en Android y escritorio): elige el contacto del teléfono
   // y la invitación abre el chat directo de WhatsApp con esa persona.
@@ -79,10 +85,10 @@ export function AddMemberSheet({ visible, onClose, onSubmit, loading }: { visibl
         <Option testID="channel-whatsapp" active={channel === "whatsapp"} onPress={() => setChannel("whatsapp")} title="WhatsApp" sub="Se abre WhatsApp con el enlace" icon="logo-whatsapp" />
         <Option testID="channel-sms" active={channel === "sms"} onPress={() => setChannel("sms")} title="SMS" sub="Se abre Mensajes" icon="chatbox" />
       </View>
-      <T style={{ color: colors.muted, fontSize: 12, marginTop: spacing.md }}>Sentinel no puede confirmar la entrega del mensaje: mostrará “Invitación preparada” hasta que la persona acepte.</T>
+      <T style={{ color: colors.muted, fontSize: 12, marginTop: spacing.md }}>BAYMOVE prepara la invitación. Tú decidirás cuándo compartirla; no mostraremos entrega confirmada sin evidencia.</T>
       <View style={{ marginTop: spacing.lg }}>
         <Button testID="add-member-submit" title="Crear invitación" loading={loading} disabled={name.trim().length < 1}
-          onPress={() => { onSubmit({ name: name.trim(), membership, channel, duration_hours: membership === "temporary" ? hours : undefined, phone: phone.trim() || undefined }); reset(); }} />
+          onPress={() => onSubmit({ name: name.trim(), membership, channel, duration_hours: membership === "temporary" ? hours : undefined, phone: phone.trim() || undefined })} />
       </View>
     </Sheet>
   );
