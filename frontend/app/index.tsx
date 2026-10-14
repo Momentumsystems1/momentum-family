@@ -27,9 +27,9 @@ export default function Index() {
     })();
   }, [user, loading]);
 
-  // Explicit opt-in for local Expo Go UI smoke tests only.
-  // Does not authenticate, grant any permissions, or change server access.
-  if (__DEV__ && process.env.EXPO_PUBLIC_BAYMOVE_MAP_REVIEW === "1") {
+  // Standalone review builds with EXPO_PUBLIC_BAYMOVE_MAP_REVIEW=1 go straight to the map.
+  // This is a front-end UI preview, not an authentication bypass on the server.
+  if (process.env.EXPO_PUBLIC_BAYMOVE_MAP_REVIEW === "1") {
     return <Redirect href="/map" />;
   }
   if (target) return <Redirect href={target as any} />;
