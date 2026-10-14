@@ -1,167 +1,276 @@
-// Signature experience: spatial group creation (P2). Group nucleus, orbital members, physics birth animation,
-// pending gray → active vivid, ENVIAR A TODOS inside the field, formation links and collapse into the Mini-Orb.
+// Functional BAYMOVE Circle Express. One explicit POST creates a circle.
+// No automatic creation on mount, fake orbit slots, or simulated deliveries.
 import Ionicons from "@react-native-vector-icons/ionicons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
-import { Pressable, TextInput, useWindowDimensions, View } from "react-native";
-import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { useState } from "react";
+import { ActivityIndicator, Pressable, ScrollView, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { api, unavailableOf } from "@/src/api";
 import { useAuth } from "@/src/auth";
-import { OrbitalField, OrbitalMember } from "@/src/components/OrbitalField";
+import { CircleOrbit } from "@/src/components/CircleOrbit";
 import { AddMemberSheet, MemberInfo, MemberSheet, NewInvite } from "@/src/components/sheets";
 import { Button, showUnavailable, T, toast } from "@/src/components/ui";
 import { dispatchInvitation, Invitation } from "@/src/invites";
-import { fonts, makeStyles, radius, spacing, useTheme } from "@/src/theme";
+import { fonts, radius, spacing, useTheme } from "@/src/theme";
 
-type Group = { id: string; name: string; members: (MemberInfo & { user_id?: string; color: string })[]; stats: any };
+type Group = {
+  id: string;
+  name: string;
+  state: string;
+  members: (MemberInfo & { user_id?: string | null; color: string })[];
+  stats: { members: number; pending: number };
+};
+
+const RED = "#C91E32";
+const LIGHT = "rgba(201,30,50,0.05)";
+const INK = "#30272B";
+const MUTED = "#716873";
 
 export default function GroupCreation() {
   const router = useRouter();
-  const { user, reload } = useAuth();
   const qc = useQueryClient();
-  const s = useStyles();
-  const { colors } = useTheme();
+  const { user, reload } = useAuth();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const size = Math.min(width - spacing.xl * 2, 380);
-  const [phase, setPhase] = useState<"editing" | "forming" | "collapsing">("editing");
+  const { colors } = useTheme();
+  const [name, setName] = useState("");
   const [adding, setAdding] = useState(false);
   const [selected, setSelected] = useState<MemberInfo | null>(null);
-  const [newIds, setNewIds] = useState<string[]>([]);
-  const [sending, setSending] = useState(false);
-  const finishingRef = useRef(false);
-  const nameRef = useRef<TextInput>(null);
+  const [finishing, setFinishing] = useState(false);
+  const [sharingId, setSharingId] = useState<string | null>(null);
 
-  const groups = useQuery({ queryKey: ["groups"], queryFn: () => api<Group[]>("/groups") });
-  const group = groups.data?.[0];
+  const groups = useQuery({
+    queryKey: ["groups"],
+    queryFn: () => api<Group[]>("/groups"),
+    refetchInterval: 15000,
+  });
+  const group = groups.data?.[0] ?? null;
 
   const create = useMutation({
-    mutationFn: () => api<Group>("/groups", { method: "POST", json: { name: "Grupo 1" } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["groups"] }),
-    onError: (e) => { const u = unavailableOf(e); if (u) showUnavailable(u); else toast((e as any).message, "error"); },
-  });
-  useEffect(() => { if (groups.isSuccess && groups.data.length === 0 && !create.isPending && !create.isError) create.mutate(); }, [groups.isSuccess, groups.data, create]);
-
-  const [name, setName] = useState<string | null>(null);
-  const rename = useMutation({
-    mutationFn: (n: string) => api(`/groups/${group!.id}`, { method: "PATCH", json: { name: n } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["groups"] }),
+    mutationFn: async (title: string) => api<Group>("/groups", {
+      method: "POST", json: { name: title },
+    }),
+    onSuccess: async (created) => {
+      qc.setQueryData<Group[]>(["groups"], (prev) => prev?.length ? prev : [created]);
+      await qc.invalidateQueries({ queryKey: ["groups"] });
+      toast("Círculo creado en tu cuenta", "success");
+    },
+    onError: (e: unknown) => {
+      const u = unavailableOf(e);
+      if (u) showUnavailable(u);
+      else toast((e as Error).message || "No se pudo crear el círculo", "error");
+      // If a network response was lost AFTER persistence, refetch avoids a
+      // duplicate attempt against the free plan's one-circle limit.
+      void groups.refetch();
+    },
   });
 
   const invite = useMutation({
-    mutationFn: (v: NewInvite) => api<{ invitation: Invitation; member: { id: string } }>(`/groups/${group!.id}/invitations`, { method: "POST", json: v }),
-    onSuccess: async (r) => { setNewIds((p) => [...p, r.member.id]); setAdding(false); await qc.invalidateQueries({ queryKey: ["groups"] }); },
-    onError: (e) => { const u = unavailableOf(e); if (u) { setAdding(false); showUnavailable(u); } else toast((e as any).message, "error"); },
+    mutationFn: async (payload: NewInvite) =>
+      api<{ invitation: Invitation; member: MemberInfo }>(`/groups/${group!.id}/invitations`, {
+        method: "POST", json: payload,
+      }),
+    onSuccess: async () => {
+      setAdding(false);
+      await qc.invalidateQueries({ queryKey: ["groups"] });
+      toast("Invitación preparada. Pulsa Compartir para enviarla.", "success");
+    },
+    onError: (e: unknown) => {
+      const u = unavailableOf(e);
+      if (u) showUnavailable(u);
+      else toast((e as Error).message || "No se pudo preparar la invitación", "error");
+    },
   });
 
-  const act = useMutation({
-    mutationFn: ({ path }: { path: string }) => api(path, { method: "POST" }),
-    onSuccess: () => { setSelected(null); qc.invalidateQueries({ queryKey: ["groups"] }); },
-    onError: (e: any) => toast(e.message, "error"),
+  const mutation = useMutation({
+    mutationFn: (path: string) => api(path, { method: "POST" }),
+    onSuccess: () => {
+      setSelected(null);
+      void qc.invalidateQueries({ queryKey: ["groups"] });
+    },
+    onError: (e: Error) => toast(e.message, "error"),
   });
 
-  const members: OrbitalMember[] = (group?.members ?? []).map((m) => ({
-    id: m.id, name: m.display_name, color: m.color, isMe: m.user_id === user?.id, isNew: newIds.includes(m.id),
-    status: m.status === "active" ? "active" : m.status === "declined" ? "declined" : m.status === "expired" ? "expired" : "pending",
-  }));
-  const pendingInvites = (group?.members ?? []).filter((m) => m.status === "pending" && m.invitation?.status === "prepared");
-
-  const finish = async () => {
-    if (!group || finishingRef.current || phase !== "editing") return;
-    finishingRef.current = true;
-    setPhase("forming");
+  const share = async (member: Group["members"][number]) => {
+    const v = member.invitation as Invitation | undefined;
+    if (!v?.id || !v.link) {
+      toast("Enlace no disponible. Actualiza el círculo.", "error");
+      return;
+    }
+    setSharingId(member.id);
     try {
-      // Wait for the real backend to confirm the circle was saved.
-      // Never enter the map or claim success on an unsuccessful request.
-      const enteredName = (name ?? group.name).trim();
-      if (enteredName && enteredName !== group.name) {
-        await api(`/groups/${group.id}`, { method: "PATCH", json: { name: enteredName } });
-        await qc.invalidateQueries({ queryKey: ["groups"] });
-      }
+      const r = await dispatchInvitation({
+        ...v,
+        name: member.display_name,
+        group_name: group!.name,
+        membership: member.membership,
+      });
+      toast(r.label, r.ok ? "success" : "error");
+      await qc.invalidateQueries({ queryKey: ["groups"] });
+    } finally {
+      setSharingId(null);
+    }
+  };
+
+  const goToMap = async () => {
+    if (!group || finishing) return;
+    setFinishing(true);
+    try {
+      // The map is entered only after the server confirms onboarding.
       await api(`/groups/${group.id}/formed`, { method: "POST" });
       await reload();
-      setPhase("collapsing");
-      setTimeout(() => router.replace({ pathname: "/map", params: { welcome: "1" } }), 600);
+      await qc.invalidateQueries({ queryKey: ["groups"] });
+      router.replace({ pathname: "/map", params: { welcome: "1" } });
     } catch (e: any) {
-      setPhase("editing");
-      toast(e?.message ?? "No se pudo guardar el círculo. Vuelve a intentarlo.", "error");
+      toast(e?.message ?? "No se pudo terminar. Inténtalo otra vez.", "error");
     } finally {
-      finishingRef.current = false;
+      setFinishing(false);
     }
   };
 
-  const sendAll = async () => {
-    if (!group) return;
-    setSending(true);
-    let launched = 0;
-    for (const m of pendingInvites) {
-      const full = { ...(m.invitation as any), name: m.display_name, group_name: group.name, membership: m.membership } as Invitation;
-      const r = await dispatchInvitation(full);
-      toast(`${m.display_name}: ${r.label}`, r.ok ? "success" : "error");
-      if (r.ok) launched++;
+  const skip = async () => {
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      await api("/profile/onboarding-step", { method: "PUT", json: { step: "done" } });
+      await reload();
+      router.replace("/map");
+    } catch (e: any) {
+      toast(e?.message ?? "No se pudo continuar", "error");
+    } finally {
+      setFinishing(false);
     }
-    setSending(false);
-    await qc.invalidateQueries({ queryKey: ["groups"] });
-    if (launched === pendingInvites.length || pendingInvites.length === 0) finish();
   };
-
-  if (!group) {
-    return <View style={[s.root, { alignItems: "center", justifyContent: "center" }]} testID="group-creation-loading"><T style={{ color: colors.muted }}>{create.isError ? "No se pudo crear el grupo" : "Preparando tu grupo…"}</T>
-      {create.isError ? <View style={{ marginTop: 16 }}><Button testID="group-retry" title="Reintentar" onPress={() => create.mutate()} /><Button testID="group-skip" title="Continuar sin grupo" variant="ghost" onPress={async () => { await api("/profile/onboarding-step", { method: "PUT", json: { step: "done" } }); await reload(); router.replace("/map"); }} /></View> : null}
-    </View>;
-  }
 
   return (
-    <View style={s.root} testID="onboarding-group">
-      <View style={[s.top, { paddingTop: insets.top + spacing.lg }]}>
-        <T style={{ color: colors.muted, fontSize: 13 }}>Tu primer Grupo</T>
-        <View style={s.nameRow}>
-          <TextInput ref={nameRef} testID="group-name-input" style={s.nameInput} value={name ?? group.name} onChangeText={setName}
-            onEndEditing={() => { if (name && name !== group.name) rename.mutate(name); }} editable={phase === "editing"} returnKeyType="done" />
-          <Pressable testID="group-name-edit" onPress={() => nameRef.current?.focus()} style={s.editBtn}><Ionicons name="pencil" size={16} color={colors.muted} /></Pressable>
+    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }} testID="circle-express-screen">
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{
+        flexGrow: 1,
+        paddingTop: insets.top + spacing.xl,
+        paddingBottom: insets.bottom + spacing.xl,
+        paddingHorizontal: spacing.lg,
+        maxWidth: 580,
+        width: "100%",
+        alignSelf: "center",
+        gap: spacing.lg,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ gap: 4, flex: 1 }}>
+            <T weight="bold" style={{ fontSize: 28, color: INK }}>Tu círculo BAYMOVE</T>
+            <T style={{ color: MUTED, fontSize: 13 }}>Un espacio privado para tus personas de confianza.</T>
+          </View>
+          <View style={{ backgroundColor: LIGHT, borderRadius: radius.pill, padding: 12 }}>
+            <Ionicons name="people" size={22} color={RED} />
+          </View>
         </View>
-      </View>
 
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-        <OrbitalField members={members} size={size} phase={phase} groupName={name ?? group.name}
-          onMemberPress={(m) => { if (phase !== "editing") return; const full = group.members.find((x) => x.id === m.id); if (full && !m.isMe) setSelected(full); }}
-          center={phase === "editing" && members.length > 1 ? (
-            <Pressable testID="send-all-button" onPress={sendAll} disabled={sending} style={s.sendAll}>
-              <Ionicons name="paper-plane" size={16} color={colors.onBrandPrimary} />
-              <T weight="bold" style={{ color: colors.onBrandPrimary, fontSize: 11, textAlign: "center" }}>{sending ? "ENVIANDO…" : pendingInvites.length ? "ENVIAR A TODOS" : "FORMAR GRUPO"}</T>
+        {groups.isLoading ? (
+          <View style={{ alignItems: "center", paddingVertical: 48, gap: 12 }}>
+            <ActivityIndicator color={RED} />
+            <T style={{ color: MUTED }}>Comprobando tus círculos…</T>
+          </View>
+        ) : groups.isError && !group ? (
+          <View style={{ backgroundColor: LIGHT, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md }}>
+            <T style={{ color: INK }}>No se pudo conectar con BAYMOVE. No crearemos un círculo sin confirmación del servidor.</T>
+            <Button testID="circle-express-retry" title="Volver a intentar" onPress={() => void groups.refetch()} />
+          </View>
+        ) : group ? (
+          <>
+            <View style={{ backgroundColor: LIGHT, borderRadius: radius.lg, padding: spacing.md, alignItems: "center" }}>
+              <T weight="semibold" style={{ color: INK, fontSize: 20 }}>{group.name}</T>
+              <T style={{ color: MUTED, fontSize: 12 }}>{group.stats?.members ?? 1} personas confirmadas · {group.stats?.pending ?? 0} invitaciones pendientes</T>
+              <CircleOrbit
+                name={group.name}
+                members={group.members}
+                ownerId={user?.id}
+                size={Math.min(width - spacing.xl * 2, 360)}
+                onMemberPress={(m) => setSelected(m)}
+              />
+            </View>
+            <Button testID="circle-express-add" title="Añadir persona" icon="person-add" onPress={() => setAdding(true)} />
+            {(group.members ?? []).filter(m => m.status === "pending").map(m => (
+              <View key={m.id} style={{
+                flexDirection: "row", alignItems: "center", borderRadius: radius.md,
+                borderWidth: 1, borderColor: "#E8E1E4", backgroundColor: "#FFFFFF",
+                padding: 12, gap: 12,
+              }}>
+                <View style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: "#ECE8ED" }}>
+                  <Ionicons name="time-outline" size={18} color={MUTED} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <T weight="semibold" style={{ color: INK }}>{m.display_name}</T>
+                  <T style={{ color: MUTED, fontSize: 12 }}>{m.invitation?.status === "prepared" ? "Enlace aún sin compartir" : "Pendiente de aceptación"}</T>
+                </View>
+                <Pressable
+                  testID={`circle-express-share-${m.id}`}
+                  onPress={() => void share(m)}
+                  disabled={sharingId === m.id}
+                  accessibilityRole="button"
+                  style={{ backgroundColor: LIGHT, borderRadius: 12, padding: 12 }}
+                >
+                  <T weight="semibold" style={{ color: RED, fontSize: 13 }}>{sharingId === m.id ? "Abriendo…" : "Compartir"}</T>
+                </Pressable>
+              </View>
+            ))}
+            <Button testID="circle-express-finish" title="Abrir mi círculo en el mapa" icon="map" loading={finishing} onPress={() => void goToMap()} />
+            <T style={{ fontSize: 12, lineHeight: 18, color: MUTED, textAlign: "center" }}>
+              Las invitaciones solo se activan cuando la otra persona las acepta. Compartir ubicación requiere permiso independiente.
+            </T>
+          </>
+        ) : (
+          <>
+            <View style={{ backgroundColor: LIGHT, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.md }}>
+              <T weight="semibold" style={{ fontSize: 15, color: INK }}>Nombre del círculo</T>
+              <TextInput
+                testID="circle-express-name"
+                placeholder="Ej. Mi familia"
+                placeholderTextColor="#8C828A"
+                autoCapitalize="sentences"
+                maxLength={48}
+                value={name}
+                onChangeText={setName}
+                style={{
+                  borderColor: "#E5DDE1", borderWidth: 1, borderRadius: radius.md,
+                  height: 54, paddingHorizontal: spacing.lg, fontSize: 17,
+                  color: INK, backgroundColor: "#FFFFFF", fontFamily: fonts.medium,
+                }}
+              />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" }}>
+                <View style={{ borderColor: RED, borderWidth: 1.5, backgroundColor: "#FFFFFF", borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11 }}>
+                  <T weight="semibold" style={{ color: RED }}>Círculo Base</T>
+                  <T style={{ fontSize: 11, color: MUTED }}>Personas de confianza</T>
+                </View>
+                <View style={{ borderColor: "#E6E0E2", borderWidth: 1, backgroundColor: "#F8F7F8", borderRadius: 16, paddingHorizontal: 14, paddingVertical: 11 }}>
+                  <T weight="semibold" style={{ color: MUTED }}>Flash</T>
+                  <T style={{ fontSize: 11, color: MUTED }}>Próximamente</T>
+                </View>
+              </View>
+              <Button
+                testID="circle-express-create"
+                title="Crear círculo"
+                icon="add-circle"
+                loading={create.isPending}
+                disabled={!name.trim() || create.isPending}
+                onPress={() => create.mutate(name.trim())}
+              />
+              <T style={{ color: MUTED, fontSize: 12 }}>
+                No necesitas elegir un número de personas. Podrás invitarlas después, individualmente o como invitados temporales.
+              </T>
+            </View>
+            <Pressable accessibilityRole="button" testID="circle-express-skip" disabled={finishing} onPress={() => void skip()} style={{ padding: spacing.md }}>
+              <T style={{ color: MUTED, textAlign: "center" }}>Continuar sin círculo por ahora</T>
             </Pressable>
-          ) : undefined} />
-        {phase !== "editing" ? (
-          <Animated.View entering={FadeIn} exiting={FadeOut} style={{ position: "absolute", bottom: 24 }}>
-            <T weight="semibold" style={{ color: colors.muted }} testID="group-forming-label">{phase === "forming" ? "Formando el grupo…" : "Creando tu Mini-Orb…"}</T>
-          </Animated.View>
-        ) : null}
-      </View>
-
-      {phase === "editing" ? (
-        <View style={[s.actions, { paddingBottom: insets.bottom + spacing.lg }]}>
-          <Button testID="add-member-button" title="Añadir persona" icon="person-add" onPress={() => setAdding(true)} />
-          <Button testID="group-continue-button" title={members.length > 1 ? "Continuar sin enviar ahora" : "Continuar sin invitar"} variant="ghost" onPress={finish} />
-        </View>
-      ) : null}
-
-      <AddMemberSheet visible={adding} onClose={() => setAdding(false)} loading={invite.isPending} onSubmit={(v) => invite.mutate(v)} />
+          </>
+        )}
+        <View style={{ flex: 1 }} />
+      </ScrollView>
+      <AddMemberSheet visible={adding} onClose={() => setAdding(false)} loading={invite.isPending} onSubmit={v => invite.mutate(v)} />
       <MemberSheet member={selected} onClose={() => setSelected(null)} canManage
-        onResend={() => selected?.invitation && act.mutate({ path: `/invitations/${selected.invitation.id}/resend` })}
-        onCancel={() => selected?.invitation && act.mutate({ path: `/invitations/${selected.invitation.id}/cancel` })} />
+        onResend={() => selected?.invitation?.id && mutation.mutate(`/invitations/${selected.invitation.id}/resend`)}
+        onCancel={() => selected?.invitation?.id && mutation.mutate(`/invitations/${selected.invitation.id}/cancel`)}
+      />
     </View>
   );
 }
-
-const useStyles = makeStyles((c) => ({
-  root: { flex: 1, backgroundColor: c.surface },
-  top: { paddingHorizontal: spacing.xl },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  nameInput: { flex: 1, fontFamily: fonts.bold, fontSize: 28, color: c.onSurface, paddingVertical: 4 },
-  editBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: c.surfaceTertiary, alignItems: "center", justifyContent: "center" },
-  sendAll: { alignItems: "center", justifyContent: "center", gap: 4, width: "100%", height: "100%", borderRadius: radius.pill },
-  actions: { paddingHorizontal: spacing.xl, gap: spacing.xs },
-}));
