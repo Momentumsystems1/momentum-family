@@ -45,7 +45,7 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
   const ref = useRef<MapView>(null);
   const located = people.filter((p) => p.state === "shared" && p.lat != null);
   const me = located.find((p) => p.is_me);
-  const c = center ?? (me ? { lat: me.lat!, lng: me.lng! } : located[0] ? { lat: located[0].lat!, lng: located[0].lng! } : { lat: 40.4168, lng: -3.7038 });
+  const c = center ?? (me ? { lat: me.lat!, lng: me.lng! } : located[0] ? { lat: located[0].lat!, lng: located[0].lng! } : { lat: 40.05, lng: -3.60 });
   const iosMapsConfigured = Constants.expoConfig?.extra?.g3000GoogleMapsIOSConfigured === true;
   const androidMapsConfigured = Constants.expoConfig?.extra?.g3000GoogleMapsAndroidConfigured === true;
   // Android always uses Google Maps; iOS falls back to Apple Maps until its native key is installed.
@@ -84,7 +84,7 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
   return (
     <View style={{ flex: 1, backgroundColor: colors.mapTint }} testID="map-canvas">
       <MapView ref={ref} style={{ flex: 1 }} provider={provider} customMapStyle={scheme === "dark" ? DARK_STYLE : LIGHT_STYLE} userInterfaceStyle={scheme}
-        initialCamera={{ center: { latitude: c.lat, longitude: c.lng }, pitch: perspective === "3d" ? 45 : 0, heading: 0, zoom: center ? 15 : 12, altitude: 900 }}
+        initialCamera={{ center: { latitude: c.lat, longitude: c.lng }, pitch: perspective === "3d" ? 45 : 0, heading: 0, zoom: center || me ? 15 : 6, altitude: 900 }}
         pitchEnabled={true} rotateEnabled={true}
         showsCompass={true} toolbarEnabled={false} showsMyLocationButton={false}
         onPress={(e) => { if ((e.nativeEvent as any).action === "marker-press") return; onMapPress?.(coord(e)); }}
