@@ -5,6 +5,7 @@ import { Platform, Text, View } from "react-native";
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from "react-native-maps";
 
 import { PersonAvatar } from "@/src/components/orbs";
+import { MapCanvasOpen } from "@/src/components/MapCanvasOpen";
 import { useTheme } from "@/src/theme";
 
 export type MapPerson = { member_id: string; user_id: string; name: string; color: string; state: string; lat?: number; lng?: number; is_me?: boolean; label?: string; precision?: string; at?: string; status?: string | null; photo_url?: string | null };
@@ -85,6 +86,16 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
       { edgePadding: { top: 165, right: 65, bottom: 235, left: 55 }, animated: true },
     );
   }, [polyline]);
+
+  // Android standalone without a Google Maps key: use actual freely licensed
+  // online vector tiles instead of rendering an unauthenticated blank Google map.
+  if (Platform.OS === "android" && !androidMapsConfigured) {
+    return <MapCanvasOpen people={people} pins={pins} polyline={polyline}
+      center={center} selected={selected} perspective={perspective}
+      onPersonPress={onPersonPress} onMapPress={onMapPress}
+      onMapLongPress={onMapLongPress} onInteractionStart={onInteractionStart}
+      onInteractionEnd={onInteractionEnd} />;
+  }
 
   const coord = (e: any) => ({ lat: e.nativeEvent.coordinate.latitude, lng: e.nativeEvent.coordinate.longitude });
   return (
