@@ -7,7 +7,6 @@ import WebView, { WebViewMessageEvent } from "react-native-webview";
 
 import type { MapCanvasProps, LatLng, MapPerson } from "@/src/components/MapCanvas";
 
-const RED = "#C91E32";
 const encode = (v: unknown) => JSON.stringify(v).replace(/</g, "\\u003c");
 
 type Payload = {
@@ -48,7 +47,7 @@ const html = `<!doctype html><html lang="es"><head>
      peopleMarkers.push(new maplibregl.Marker({element:el}).setLngLat([p.lng,p.lat]).addTo(map));
    }
    for(const p of d.pins||[]) {
-     const el=makePin("●",p.color||RED,"pin");
+     const el=makePin("●",p.color||"#C91E32","pin");
      pinMarkers.push(new maplibregl.Marker({element:el}).setLngLat([p.lng,p.lat]).addTo(map));
    }
    if(d.selected)selectionMarker=new maplibregl.Marker({color:"#C91E32"}).setLngLat([d.selected.lng,d.selected.lat]).addTo(map);
