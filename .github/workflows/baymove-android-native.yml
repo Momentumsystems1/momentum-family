@@ -31,7 +31,7 @@ jobs:
   android-debug:
     name: Native debug APK compile
     if: github.ref == 'refs/heads/recovery/my-cluster-core-20261013'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 55
     defaults:
       run:
@@ -45,12 +45,12 @@ jobs:
       G3000_MAPS_IOS_API_KEY: ""
     steps:
       - name: Checkout only recovery branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           persist-credentials: false
 
       - name: Install Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '22'
 
