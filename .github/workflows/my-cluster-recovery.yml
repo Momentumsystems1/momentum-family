@@ -4,6 +4,7 @@ on:
     branches:
       - recovery/my-cluster-core-20261013
       - feature/baymove-functional-circle-20261014
+      - feature/baymove-unified-map-20261014
   workflow_dispatch:
 
 permissions:
