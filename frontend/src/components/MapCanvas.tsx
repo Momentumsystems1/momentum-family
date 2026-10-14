@@ -50,7 +50,9 @@ export function MapCanvas({ people, pins = [], polyline, onPersonPress, center, 
   const androidMapsConfigured = Constants.expoConfig?.extra?.g3000GoogleMapsAndroidConfigured === true;
   // Android always uses Google Maps; iOS falls back to Apple Maps until its native key is installed.
   const provider = Platform.OS === "android" || iosMapsConfigured ? PROVIDER_GOOGLE : undefined;
-  const missingAndroidKey = Platform.OS === "android" && !androidMapsConfigured;
+  // Expo Go supplies its own native Google Maps configuration. The project's
+  // standalone Android binary still requires our restricted G3000 Maps key.
+  const missingAndroidKey = Platform.OS === "android" && !androidMapsConfigured && Constants.appOwnership !== "expo";
 
   useEffect(() => {
     if (center) {
