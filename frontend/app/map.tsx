@@ -50,10 +50,11 @@ export default function MapHome() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const [mode, setMode] = useState<Mode>("explore");
-  const [perspective, setPerspective] = useState<"2d" | "3d">("2d");
+  const [perspective, setPerspective] = useState<"2d" | "3d">("3d");
   const [selected, setSelected] = useState<LatLng | null>(null);
   const [selectedPlace, setSelectedPlace] = useState("");
   const [location, setLocation] = useState<LatLng | null>(null);
+  const [localLocationError, setLocalLocationError] = useState<string | null>(null);
   const [focus, setFocus] = useState<(LatLng & { key: number }) | undefined>();
   const [showLocationPrompt, setShowLocationPrompt] = useState(false);
   const [search, setSearch] = useState("");
@@ -113,8 +114,8 @@ export default function MapHome() {
     let alive = true;
     Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
       .then((p) => {
-        if (alive) setLocation({ lat: p.coords.latitude, lng: p.coords.longitude });
-      }).catch(() => null);
+        if (alive) { setLocation({ lat: p.coords.latitude, lng: p.coords.longitude }); setLocalLocationError(null); }
+      }).catch((e) => { if (alive) setLocalLocationError(e instanceof Error ? e.message : "No se pudo obtener la ubicación"); });
     return () => { alive = false; };
   }, [gps.perm]);
   useEffect(() => {
